@@ -5,7 +5,7 @@ It is a **modified version** of Fallout 2 Community Edition (see [NOTICE.md](NOT
 runs on Windows with Direct3D 11. This repository holds no game data and no HD art; to play,
 you need your own copy of Fallout 2.
 
-- **Download:** https://www.nexusmods.com/fallout2/mods/193
+- **Download:** the [engine](https://github.com/mrdushidush/dustlight/releases/tag/v0.9.0-beta) from this repository's release page, and one art pack from [Nexus Mods](https://www.nexusmods.com/fallout2/mods/193).
 - **Install and settings:** in the README inside the download; its template, with the
   blanks filled at release time, is [docs/player/README.md](docs/player/README.md)
 - **What's new here:** `src/hd/` (the renderer, HD art store, lighting and HD interface),
