@@ -17,8 +17,11 @@ you need your own copy of Fallout 2.
   non-commercial.
 - **AI:** characters and creatures use no AI: they are the original pixels, enlarged with
   Scale2x. The world, items, talking heads, interface and fonts are upscaled by an AI model,
-  and the world is mixed back with the original pixels. Much of the code was written with
-  Claude under the author's direction. Decisions and reviews of the results are the author's.
+  [4x-UltraSharpV2](https://github.com/Kim2091/Kim2091-Models) by Kim2091, used with
+  [Kim2091's permission](https://github.com/Kim2091/Kim2091-Models/issues/6)
+  ([support Kim2091's work](https://ko-fi.com/J3J3BCC3L)), and the world is mixed back with the
+  original pixels. Much of the code was written with Claude under the author's direction.
+  Decisions and reviews of the results are the author's.
 
 The rest of this file is Fallout 2 CE's own README.
 
