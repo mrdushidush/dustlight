@@ -24,6 +24,7 @@
 #include "game_sound.h"
 #include "geometry.h"
 #include "graph_lib.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "interface.h"
 #include "item.h"
@@ -1419,6 +1420,9 @@ static int characterEditorWindowInit()
             if (gCharacterEditorFrmCopy[i] == nullptr) {
                 break;
             }
+            // HD UI: CE draws labels into these copies and copies them into the window.
+            hd::uiScratchRegister(gCharacterEditorFrmCopy[i], _editorFrmImages[i].getWidth(), _editorFrmImages[i].getHeight());
+            hd::uiRecordFrameCopy(gCharacterEditorFrmCopy[i], _editorFrmImages[i].getData(), _editorFrmImages[i].getWidth(), _editorFrmImages[i].getHeight());
             memcpy(gCharacterEditorFrmCopy[i], _editorFrmImages[i].getData(), static_cast<size_t>(_editorFrmImages[i].getWidth()) * _editorFrmImages[i].getHeight());
         } else {
             gCharacterEditorFrmCopy[i] = (unsigned char*)-1;
@@ -1428,6 +1432,7 @@ static int characterEditorWindowInit()
     if (i != EDITOR_GRAPHIC_COUNT) {
         while (--i >= 0) {
             if (gCharacterEditorFrmShouldCopy[i]) {
+                hd::uiScratchFree(gCharacterEditorFrmCopy[i]);
                 internal_free(gCharacterEditorFrmCopy[i]);
             }
         }
@@ -1455,6 +1460,7 @@ static int characterEditorWindowInit()
     if (gCharacterEditorWindow == -1) {
         for (i = 0; i < EDITOR_GRAPHIC_COUNT; i++) {
             if (gCharacterEditorFrmShouldCopy[i]) {
+                hd::uiScratchFree(gCharacterEditorFrmCopy[i]);
                 internal_free(gCharacterEditorFrmCopy[i]);
             }
             _editorFrmImages[i].unlock();
@@ -1469,6 +1475,7 @@ static int characterEditorWindowInit()
     }
 
     gCharacterEditorWindowBuffer = windowGetBuffer(gCharacterEditorWindow);
+    hd::uiRecordFrameCopy(gCharacterEditorWindowBuffer, _editorBackgroundFrmImage.getData(), 640, 480);
     memcpy(gCharacterEditorWindowBuffer, _editorBackgroundFrmImage.getData(), 640 * 480);
 
     if (gCharacterEditorIsCreationMode) {
@@ -1931,6 +1938,7 @@ static void characterEditorWindowFree()
         _editorFrmImages[index].unlock();
 
         if (gCharacterEditorFrmShouldCopy[index]) {
+            hd::uiScratchFree(gCharacterEditorFrmCopy[index]);
             internal_free(gCharacterEditorFrmCopy[index]);
         }
     }
@@ -2518,9 +2526,11 @@ static void characterEditorDrawGender()
     width = _editorFrmImages[EDITOR_GRAPHIC_SEX_ON].getWidth();
     x = (width / 2) - (fontGetStringWidth(text) / 2);
 
+    hd::uiRecordFrameCopy(gCharacterEditorFrmCopy[11], _editorFrmImages[EDITOR_GRAPHIC_SEX_ON].getData(), width, _editorFrmImages[EDITOR_GRAPHIC_SEX_ON].getHeight());
     memcpy(gCharacterEditorFrmCopy[11],
         _editorFrmImages[EDITOR_GRAPHIC_SEX_ON].getData(),
         static_cast<size_t>(width) * _editorFrmImages[EDITOR_GRAPHIC_SEX_ON].getHeight());
+    hd::uiRecordFrameCopy(gCharacterEditorFrmCopy[EDITOR_GRAPHIC_SEX_OFF], _editorFrmImages[10].getData(), width, _editorFrmImages[EDITOR_GRAPHIC_SEX_OFF].getHeight());
     memcpy(gCharacterEditorFrmCopy[EDITOR_GRAPHIC_SEX_OFF],
         _editorFrmImages[10].getData(),
         static_cast<size_t>(width) * _editorFrmImages[EDITOR_GRAPHIC_SEX_OFF].getHeight());
@@ -2548,9 +2558,11 @@ static void characterEditorDrawAge()
     width = _editorFrmImages[EDITOR_GRAPHIC_AGE_ON].getWidth();
     x = (width / 2) + 1 - (fontGetStringWidth(text) / 2);
 
+    hd::uiRecordFrameCopy(gCharacterEditorFrmCopy[EDITOR_GRAPHIC_AGE_ON], _editorFrmImages[EDITOR_GRAPHIC_AGE_ON].getData(), width, _editorFrmImages[EDITOR_GRAPHIC_AGE_ON].getHeight());
     memcpy(gCharacterEditorFrmCopy[EDITOR_GRAPHIC_AGE_ON],
         _editorFrmImages[EDITOR_GRAPHIC_AGE_ON].getData(),
         static_cast<size_t>(width) * _editorFrmImages[EDITOR_GRAPHIC_AGE_ON].getHeight());
+    hd::uiRecordFrameCopy(gCharacterEditorFrmCopy[EDITOR_GRAPHIC_AGE_OFF], _editorFrmImages[EDITOR_GRAPHIC_AGE_OFF].getData(), width, _editorFrmImages[EDITOR_GRAPHIC_AGE_ON].getHeight());
     memcpy(gCharacterEditorFrmCopy[EDITOR_GRAPHIC_AGE_OFF],
         _editorFrmImages[EDITOR_GRAPHIC_AGE_OFF].getData(),
         static_cast<size_t>(width) * _editorFrmImages[EDITOR_GRAPHIC_AGE_ON].getHeight());
@@ -2604,9 +2616,11 @@ static void characterEditorDrawName()
     width = _editorFrmImages[EDITOR_GRAPHIC_NAME_ON].getWidth();
     x = (width / 2) + 3 - (fontGetStringWidth(text) / 2);
 
+    hd::uiRecordFrameCopy(gCharacterEditorFrmCopy[EDITOR_GRAPHIC_NAME_ON], _editorFrmImages[EDITOR_GRAPHIC_NAME_ON].getData(), _editorFrmImages[EDITOR_GRAPHIC_NAME_ON].getWidth(), _editorFrmImages[EDITOR_GRAPHIC_NAME_ON].getHeight());
     memcpy(gCharacterEditorFrmCopy[EDITOR_GRAPHIC_NAME_ON],
         _editorFrmImages[EDITOR_GRAPHIC_NAME_ON].getData(),
         static_cast<size_t>(_editorFrmImages[EDITOR_GRAPHIC_NAME_ON].getWidth()) * _editorFrmImages[EDITOR_GRAPHIC_NAME_ON].getHeight());
+    hd::uiRecordFrameCopy(gCharacterEditorFrmCopy[EDITOR_GRAPHIC_NAME_OFF], _editorFrmImages[EDITOR_GRAPHIC_NAME_OFF].getData(), _editorFrmImages[EDITOR_GRAPHIC_NAME_OFF].getWidth(), _editorFrmImages[EDITOR_GRAPHIC_NAME_OFF].getHeight());
     memcpy(gCharacterEditorFrmCopy[EDITOR_GRAPHIC_NAME_OFF],
         _editorFrmImages[EDITOR_GRAPHIC_NAME_OFF].getData(),
         static_cast<size_t>(_editorFrmImages[EDITOR_GRAPHIC_NAME_OFF].getWidth()) * _editorFrmImages[EDITOR_GRAPHIC_NAME_OFF].getHeight());
@@ -3225,6 +3239,7 @@ static int characterEditorEditAge()
 
     windowBuf = windowGetBuffer(win);
 
+    hd::uiRecordFrameCopy(windowBuf, _editorFrmImages[EDITOR_GRAPHIC_CHARWIN].getData(), windowWidth, windowHeight);
     memcpy(windowBuf, _editorFrmImages[EDITOR_GRAPHIC_CHARWIN].getData(), static_cast<size_t>(windowWidth) * windowHeight);
 
     blitBufferToBufferTrans(
@@ -3466,6 +3481,7 @@ static void characterEditorEditGender()
     unsigned char* windowBuf = windowGetBuffer(win);
 
     // Copy background
+    hd::uiRecordFrameCopy(windowBuf, _editorFrmImages[EDITOR_GRAPHIC_CHARWIN].getData(), windowWidth, windowHeight);
     memcpy(windowBuf, _editorFrmImages[EDITOR_GRAPHIC_CHARWIN].getData(), static_cast<size_t>(windowWidth) * windowHeight);
 
     blitBufferToBufferTrans(_editorFrmImages[EDITOR_GRAPHIC_DONE_BOX].getData(),
@@ -3707,6 +3723,7 @@ static int characterEditorShowOptions()
         }
 
         unsigned char* windowBuffer = windowGetBuffer(win);
+        hd::uiRecordFrameCopy(windowBuffer, _editorFrmImages[41].getData(), _editorFrmImages[41].getWidth(), _editorFrmImages[41].getHeight());
         memcpy(windowBuffer, _editorFrmImages[41].getData(), static_cast<size_t>(_editorFrmImages[41].getWidth()) * _editorFrmImages[41].getHeight());
 
         fontSetCurrent(103);
@@ -3736,6 +3753,10 @@ static int characterEditorShowOptions()
                     break;
                 }
 
+                hd::uiScratchRegister(down[index], width, height);
+                hd::uiScratchRegister(up[index], width, height);
+                hd::uiRecordFrameCopy(down[index], _editorFrmImages[43].getData(), width, height);
+                hd::uiRecordFrameCopy(up[index], _editorFrmImages[42].getData(), width, height);
                 memcpy(down[index], _editorFrmImages[43].getData(), size);
                 memcpy(up[index], _editorFrmImages[42].getData(), size);
 
@@ -3756,10 +3777,13 @@ static int characterEditorShowOptions()
 
         if (err != 0) {
             if (err == 2) {
+                hd::uiScratchFree(down[index]);
                 internal_free(down[index]);
             }
 
             while (--index >= 0) {
+                hd::uiScratchFree(up[index]);
+                hd::uiScratchFree(down[index]);
                 internal_free(up[index]);
                 internal_free(down[index]);
             }
@@ -4068,6 +4092,8 @@ static int characterEditorShowOptions()
         windowDestroy(win);
 
         for (index = 0; index < 5; index++) {
+            hd::uiScratchFree(up[index]);
+            hd::uiScratchFree(down[index]);
             internal_free(up[index]);
             internal_free(down[index]);
         }
@@ -5935,6 +5961,7 @@ static int perkDialogShow()
     }
 
     gPerkDialogWindowBuffer = windowGetBuffer(gPerkDialogWindow);
+    hd::uiRecordFrameCopy(gPerkDialogWindowBuffer, _perkDialogBackgroundFrmImage.getData(), PERK_WINDOW_WIDTH, PERK_WINDOW_HEIGHT);
     memcpy(gPerkDialogWindowBuffer, _perkDialogBackgroundFrmImage.getData(), PERK_WINDOW_WIDTH * PERK_WINDOW_HEIGHT);
 
     int btn;

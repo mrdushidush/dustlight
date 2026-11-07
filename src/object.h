@@ -66,6 +66,7 @@ bool _obj_portal_is_walk_thru(Object* obj);
 Object* objectFindById(int a1);
 Object* objectGetOwner(Object* obj);
 void _obj_remove_all();
+ObjectListNode* objectListAtTile(int tile);
 Object* objectFindFirst();
 Object* objectFindNext();
 Object* objectFindFirstAtElevation(MapElevation elevation);

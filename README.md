@@ -1,3 +1,28 @@
+# Dustlight
+
+**Dustlight is a free mod for Fallout 2: the original game with HD art and new lighting.**
+It is a **modified version** of Fallout 2 Community Edition (see [NOTICE.md](NOTICE.md)) and
+runs on Windows with Direct3D 11. This repository holds no game data and no HD art; to play,
+you need your own copy of Fallout 2.
+
+- **Install and settings:** in the README inside the download; its template, with the
+  blanks filled at release time, is [docs/player/README.md](docs/player/README.md)
+- **What's new here:** `src/hd/` (the renderer, HD art store, lighting and HD interface),
+  `tools/pipeline/` (the Python pipeline that makes the art), `docs/decisions/` (why it's
+  built this way). Changes to CE's own files are kept to thin hooks.
+- **Build:** `cmake --preset windows-x64`, then
+  `cmake --build out/build/windows-x64 --config RelWithDebInfo`.
+- **License:** the Sustainable Use License v1.0, as for CE ([LICENSE.md](LICENSE.md)): free and
+  non-commercial.
+- **AI:** characters and creatures use no AI: they are the original pixels, enlarged with
+  Scale2x. The world, items, talking heads, interface and fonts are upscaled by an AI model,
+  and the world is mixed back with the original pixels. Much of the code was written with
+  Claude under the author's direction. Decisions and reviews of the results are the author's.
+
+The rest of this file is Fallout 2 CE's own README.
+
+---
+
 # Fallout 2: Community Engine
 
 Fallout 2:CE is a fully working re-implementation of the classic Fallout engine, optimized for a hassle-free experience on multiple platforms, including Windows, Mac, iOS, Android, and Linux.  It provides high resolution support, quality-of-life improvements, and dozens upon dozens of bug fixes.

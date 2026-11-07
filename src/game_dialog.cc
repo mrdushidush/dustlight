@@ -24,6 +24,7 @@
 #include "game.h"
 #include "game_mouse.h"
 #include "game_sound.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "interface.h"
 #include "inventory.h"
@@ -2801,13 +2802,18 @@ static void gameDialogBlitIsoWindowToDisplayBuffer()
     // missing 100 is interface bar height, which is already accounted for
     // when we're using `windowGetHeight`). `windowGetWidth` is used for
     // consistency.
+    int isoX = (windowGetWidth(gIsoWindow) - 388) / 2;
+    int isoY = (windowGetHeight(gIsoWindow) - 232) / 2;
     blitBufferToBuffer(
-        src + ((windowGetHeight(gIsoWindow) - 232) / 2) * windowGetWidth(gIsoWindow) + (windowGetWidth(gIsoWindow) - 388) / 2,
+        src + isoY * windowGetWidth(gIsoWindow) + isoX,
         388,
         200,
         windowGetWidth(gIsoWindow),
         gameDialogDisplayBuffer,
         GAME_DIALOG_WINDOW_WIDTH);
+
+    // HD UI (P7b.4): the same rect of the GPU map in HD for this view.
+    hd::uiRecordMapView(gameDialogDisplayBuffer, GAME_DIALOG_WINDOW_WIDTH, isoX, isoY, 388, 200);
 }
 
 static void gameDialogRenderMapInDisplayBuffer()

@@ -16,6 +16,7 @@
 #include "game.h"
 #include "game_sound.h"
 #include "geometry.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "kb.h"
 #include "message.h"
@@ -169,6 +170,7 @@ namespace {
                 if (ctx.window.get() == -1) return false;
 
                 ctx.windowBuffer = windowGetBuffer(ctx.window.get());
+                hd::uiRecordFrameCopy(ctx.windowBuffer, frms.background.getData(), bgWidth, bgHeight);
                 memcpy(ctx.windowBuffer, frms.background.getData(), static_cast<size_t>(bgWidth) * bgHeight);
 
                 MessageListItem messageListItem;
@@ -500,6 +502,7 @@ const char* showInputDialog(const char* currentInput, int windowX, int windowY, 
     if (window.get() == -1) return nullptr;
 
     unsigned char* windowBuf = windowGetBuffer(window.get());
+    hd::uiRecordFrameCopy(windowBuf, frms.background.getData(), windowWidth, windowHeight);
     memcpy(windowBuf, frms.background.getData(), static_cast<size_t>(windowWidth) * windowHeight);
 
     input::drawBox(windowBuf, windowWidth, input::nameBoxPos, frms.nameBox);
@@ -582,6 +585,7 @@ int showDialogBox(const char* title, const char** body, int bodyLength, int x, i
 
     unsigned char* windowBuf = windowGetBuffer(window.get());
     size_t bufferSize = static_cast<size_t>(bg.getWidth()) * bg.getHeight();
+    hd::uiRecordFrameCopy(windowBuf, bg.getData(), bg.getWidth(), bg.getHeight());
     memcpy(windowBuf, bg.getData(), bufferSize);
 
     alert::DialogFrms frms;

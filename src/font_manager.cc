@@ -120,6 +120,29 @@ void interfaceFontsExit()
     }
 }
 
+bool interfaceFontsLoaded()
+{
+    return gInterfaceFontsInitialized;
+}
+
+bool interfaceFontGetView(int font, InterfaceFontView* view)
+{
+    font -= gModernFontManager.minFont;
+    if (!gInterfaceFontsInitialized || font < 0 || font >= INTERFACE_FONT_MAX || gInterfaceFontDescriptors[font].data == nullptr) {
+        return false;
+    }
+    const InterfaceFontDescriptor& descriptor = gInterfaceFontDescriptors[font];
+    view->maxHeight = descriptor.maxHeight;
+    view->letterSpacing = descriptor.letterSpacing;
+    view->wordSpacing = descriptor.wordSpacing;
+    for (int ch = 0; ch < 256; ch++) {
+        view->widths[ch] = descriptor.glyphs[ch].width;
+        view->heights[ch] = descriptor.glyphs[ch].height;
+        view->glyphData[ch] = descriptor.data + descriptor.glyphs[ch].offset;
+    }
+    return true;
+}
+
 void interfaceFontDrawTextScaled2D(const Buffer2D& dest, int x, int y, const char* string, ColorWithFlags color, float scale)
 {
     if (!gInterfaceFontsInitialized || dest.data == nullptr || string == nullptr || *string == '\0') {

@@ -12,6 +12,7 @@
 #include "debug.h"
 #include "draw.h"
 #include "game_mouse.h"
+#include "hd/draw_recorder.h"
 #include "light.h"
 #include "map.h"
 #include "map_edge.h"
@@ -728,27 +729,38 @@ static void tileRefreshGame(Rect* rect, MapElevation elevation)
 
     // HRP EdgeClipping: when clipped, clear only if CheckRect; otherwise always clear.
     if (didClear) {
-        bufferFill(gTileWindowBuffer + rectToUpdate.top * gTileWindowPitch + rectToUpdate.left,
-            rectGetWidth(&rectToUpdate),
-            rectGetHeight(&rectToUpdate),
-            gTileWindowPitch,
-            COLOR_FIRST);
+        hd::recordFill(rectToUpdate, COLOR_FIRST);
+        if (!hd::gDrawEmitOnly) {
+            bufferFill(gTileWindowBuffer + rectToUpdate.top * gTileWindowPitch + rectToUpdate.left,
+                rectGetWidth(&rectToUpdate),
+                rectGetHeight(&rectToUpdate),
+                gTileWindowPitch,
+                COLOR_FIRST);
+        }
     }
 
     if (hasVisArea && rectIntersection(&renderRect, &visArea, &renderRect) == -1) {
-        if (didClear) {
+        if (didClear && !hd::gDrawEmitOnly) {
             gTileWindowRefreshProc(&rectToUpdate);
         }
         return;
     }
 
+    hd::recordPass(hd::DrawPass::Floors);
     tileRenderFloorsInRect(&renderRect, elevation);
     _obj_render_pre_roof(&renderRect, elevation);
+    hd::recordPass(hd::DrawPass::Roofs);
     tileRenderRoofsInRect(&renderRect, elevation);
     _obj_render_post_roof(&renderRect, elevation);
 
     if (!hasVisArea) {
+        hd::recordPass(hd::DrawPass::Stencil);
         tile_hires_stencil_draw(&renderRect, gTileWindowBuffer, gTileWindowWidth, gTileWindowHeight);
+    }
+
+    // HD emitter: the traversal only records (src/hd/draw_recorder.h).
+    if (hd::gDrawEmitOnly) {
+        return;
     }
 
     gTileWindowRefreshProc(didClear ? &rectToUpdate : &renderRect);
@@ -1443,6 +1455,13 @@ static void tileRenderRoof(const TileFrmId& frmId, int x, int y, Rect* rect, int
             gEgg->sx = eggRect.left;
             gEgg->sy = eggRect.top;
 
+            hd::recordRoof(frmId.fid(), x, y, *rect, light, eggRect);
+            if (hd::gDrawEmitOnly) {
+                artUnlock(eggFrmHandle);
+                artUnlock(tileFrmHandle);
+                return;
+            }
+
             Rect intersectedRect;
             if (rectIntersection(&eggRect, &tileRect, &intersectedRect) == 0) {
                 Rect rects[4];
@@ -1802,6 +1821,17 @@ static void tileRenderFloor(const TileFrmId& frmId, int x, int y, Rect* rect)
         for (int i = 0; i < 10; i++) {
             // NOTE: Calls `lightGetTileIntensity` twice.
             _verticies[i].intensity = std::max(lightGetTileIntensity(elev, tile + _verticies[i].offsets[parity]), ambientIntensity);
+        }
+
+        if (hd::gDrawRecorderActive) {
+            int vertexIntensities[10];
+            for (int i = 0; i < 10; i++) {
+                vertexIntensities[i] = _verticies[i].intensity;
+            }
+            hd::recordFloor(frmId.fid(), savedX, savedY, *rect, tile, vertexIntensities, _intensity_map, sizeof(_intensity_map) / sizeof(_intensity_map[0]));
+            if (hd::gDrawEmitOnly) {
+                goto out;
+            }
         }
 
         int v23 = 0;

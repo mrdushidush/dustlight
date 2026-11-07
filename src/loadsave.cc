@@ -29,6 +29,7 @@
 #include "game_movie.h"
 #include "game_sound.h"
 #include "geometry.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "interface.h"
 #include "item.h"
@@ -1748,6 +1749,7 @@ static int lsgWindowInit(int windowType)
     }
 
     gLoadSaveWindowBuffer = windowGetBuffer(gLoadSaveWindow);
+    hd::uiRecordFrameCopy(gLoadSaveWindowBuffer, _loadsaveFrmImages[LOAD_SAVE_FRM_BACKGROUND].getData(), LS_WINDOW_WIDTH, LS_WINDOW_HEIGHT);
     memcpy(gLoadSaveWindowBuffer, _loadsaveFrmImages[LOAD_SAVE_FRM_BACKGROUND].getData(), LS_WINDOW_WIDTH * LS_WINDOW_HEIGHT);
 
     int messageId;
@@ -2629,6 +2631,7 @@ static int _GetComment(int slot)
     }
 
     unsigned char* windowBuffer = windowGetBuffer(window);
+    hd::uiRecordFrameCopy(windowBuffer, _loadsaveFrmImages[LOAD_SAVE_FRM_BOX].getData(), _loadsaveFrmImages[LOAD_SAVE_FRM_BOX].getWidth(), _loadsaveFrmImages[LOAD_SAVE_FRM_BOX].getHeight());
     memcpy(windowBuffer,
         _loadsaveFrmImages[LOAD_SAVE_FRM_BOX].getData(),
         static_cast<size_t>(_loadsaveFrmImages[LOAD_SAVE_FRM_BOX].getHeight()) * _loadsaveFrmImages[LOAD_SAVE_FRM_BOX].getWidth());

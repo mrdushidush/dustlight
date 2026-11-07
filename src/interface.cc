@@ -22,6 +22,7 @@
 #include "game_mouse.h"
 #include "game_sound.h"
 #include "geometry.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "inventory.h"
 #include "item.h"
@@ -560,7 +561,11 @@ int interfaceInit()
         return intface_fatal_error(-1);
     }
 
+    hd::uiScratchRegister(_itemButtonUp, INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
+    hd::uiRecordFrameCopy(_itemButtonUp, _itemButtonNormalFrmImage.getData(), INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
     memcpy(_itemButtonUp, _itemButtonNormalFrmImage.getData(), sizeof(_itemButtonUp));
+    hd::uiScratchRegister(_itemButtonDown, INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
+    hd::uiRecordFrameCopy(_itemButtonDown, _itemButtonPressedFrmImage.getData(), INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
     memcpy(_itemButtonDown, _itemButtonPressedFrmImage.getData(), sizeof(_itemButtonDown));
 
     gSingleAttackButton = buttonCreate(gInterfaceBarWindow, 267 + gInterfaceBarContentOffset, 26, INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT, -1, -1, -1, -20, _itemButtonUp, _itemButtonDown, nullptr, BUTTON_FLAG_TRANSPARENT);
@@ -1634,7 +1639,11 @@ static int interfaceBarRefreshMainAction()
     const int overlayBottomY = INTERFACE_ITEM_ACTION_BUTTON_HEIGHT - overlayPaddingX;
 
     if (itemState->isDisabled == 0) {
+        hd::uiScratchRegister(_itemButtonUp, INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
+        hd::uiRecordFrameCopy(_itemButtonUp, _itemButtonNormalFrmImage.getData(), INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
         memcpy(_itemButtonUp, _itemButtonNormalFrmImage.getData(), sizeof(_itemButtonUp));
+        hd::uiScratchRegister(_itemButtonDown, INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
+        hd::uiRecordFrameCopy(_itemButtonDown, _itemButtonPressedFrmImage.getData(), INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
         memcpy(_itemButtonDown, _itemButtonPressedFrmImage.getData(), sizeof(_itemButtonDown));
 
         if (itemState->isWeapon == 0) {
@@ -1812,7 +1821,11 @@ static int interfaceBarRefreshMainAction()
             }
         }
     } else {
+        hd::uiScratchRegister(_itemButtonUp, INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
+        hd::uiRecordFrameCopy(_itemButtonUp, _itemButtonDisabledFrmImage.getData(), INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
         memcpy(_itemButtonUp, _itemButtonDisabledFrmImage.getData(), sizeof(_itemButtonUp));
+        hd::uiScratchRegister(_itemButtonDown, INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
+        hd::uiRecordFrameCopy(_itemButtonDown, _itemButtonDisabledFrmImage.getData(), INTERFACE_ITEM_ACTION_BUTTON_WIDTH, INTERFACE_ITEM_ACTION_BUTTON_HEIGHT);
         memcpy(_itemButtonDown, _itemButtonDisabledFrmImage.getData(), sizeof(_itemButtonDown));
     }
 
@@ -2433,16 +2446,21 @@ static int indicatorBarInit()
         return -1;
     }
 
+    // HD UI: the box art, copied into each indicator's buffer under its text.
+    hd::uiScratchRegister(indicatorBoxBackgroundData, INDICATOR_BOX_WIDTH, INDICATOR_BOX_HEIGHT);
+    hd::uiRecordFrameCopy(indicatorBoxBackgroundData, indicatorBoxFrmImage.getData(), INDICATOR_BOX_WIDTH, INDICATOR_BOX_HEIGHT);
     memcpy(indicatorBoxBackgroundData, indicatorBoxFrmImage.getData(), sizeof(indicatorBoxBackgroundData));
 
     for (int index = 0; index < INDICATOR_COUNT; index++) {
         IndicatorDescription* indicatorDescription = &(gIndicatorDescriptions[index]);
 
         indicatorDescription->data = (unsigned char*)internal_malloc(INDICATOR_BOX_WIDTH * INDICATOR_BOX_HEIGHT);
+        hd::uiScratchRegister(indicatorDescription->data, INDICATOR_BOX_WIDTH, INDICATOR_BOX_HEIGHT);
         if (indicatorDescription->data == nullptr) {
             debugPrint("\nINTRFACE: Error initializing indicator box graphics! **");
 
             while (--index >= 0) {
+                hd::uiScratchFree(gIndicatorDescriptions[index].data);
                 internal_free(gIndicatorDescriptions[index].data);
                 gIndicatorDescriptions[index].data = nullptr;
             }
@@ -2503,6 +2521,7 @@ static void interfaceBarFree()
     for (int index = 0; index < INDICATOR_COUNT; index++) {
         IndicatorDescription* indicatorBoxDescription = &(gIndicatorDescriptions[index]);
         if (indicatorBoxDescription->data != nullptr) {
+            hd::uiScratchFree(indicatorBoxDescription->data);
             internal_free(indicatorBoxDescription->data);
             indicatorBoxDescription->data = nullptr;
         }
@@ -2511,6 +2530,7 @@ static void interfaceBarFree()
     for (int index = 0; index < kCustomIndicatorMaxCount; index++) {
         CustomIndicatorDescription* indicatorBoxDescription = &(customIndicatorDescriptions[index]);
         if (indicatorBoxDescription->data != nullptr) {
+            hd::uiScratchFree(indicatorBoxDescription->data);
             internal_free(indicatorBoxDescription->data);
             indicatorBoxDescription->data = nullptr;
         }
@@ -2747,6 +2767,7 @@ static void indicatorBarRenderBox(unsigned char* data, const char* text, Color c
     int oldFont = fontGetCurrent();
     fontSetCurrent(101);
 
+    hd::uiRecordCopy(data, INDICATOR_BOX_WIDTH, indicatorBoxBackgroundData, INDICATOR_BOX_WIDTH, INDICATOR_BOX_WIDTH, INDICATOR_BOX_HEIGHT, false);
     memcpy(data, indicatorBoxBackgroundData, sizeof(indicatorBoxBackgroundData));
 
     // NOTE: For unknown reason it uses 24 as a height of the box to center
@@ -2789,6 +2810,7 @@ static bool indicatorBarInitCustomTag(int tag, const char* defaultText, int conf
         if (indicator->data == nullptr) {
             return false;
         }
+        hd::uiScratchRegister(indicator->data, INDICATOR_BOX_WIDTH, INDICATOR_BOX_HEIGHT);
     }
 
     indicator->isActive = false;
@@ -2943,6 +2965,7 @@ static void customInterfaceBarInit()
 static void customInterfaceBarExit()
 {
     if (gCustomInterfaceBarBackground != nullptr) {
+        hd::uiArtFreed(gCustomInterfaceBarBackground);
         internal_free(gCustomInterfaceBarBackground);
         gCustomInterfaceBarBackground = nullptr;
     }
@@ -2981,6 +3004,7 @@ static void extendedApBarInitToWindow()
 
                 blitBuffer2D(apBarFrmBuf, ifaceBarBuf, gInterfaceBarContentOffset + apBarBgXOffset, apBarBgYOffset);
             }
+            hd::uiArtFreed(apBarArt.get()); // freed at the end of this scope
         }
     }
 
@@ -3096,6 +3120,7 @@ static void sidePanelsDraw(const char* path, int win, bool isLeading)
         windowHeight,
         windowWidth);
 
+    hd::uiArtFreed(image);
     internal_free(image);
 }
 

@@ -14,6 +14,7 @@
 #include "game_mouse.h"
 #include "game_sound.h"
 #include "graph_lib.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "kb.h"
 #include "mainmenu.h"
@@ -1080,6 +1081,7 @@ static int preferencesWindowInit()
     }
 
     gPreferencesWindowBuffer = windowGetBuffer(gPreferencesWindow);
+    hd::uiRecordFrameCopy(gPreferencesWindowBuffer, _preferencesFrmImages[PREFERENCES_WINDOW_FRM_BACKGROUND].getData(), _preferencesFrmImages[PREFERENCES_WINDOW_FRM_BACKGROUND].getWidth(), _preferencesFrmImages[PREFERENCES_WINDOW_FRM_BACKGROUND].getHeight());
     memcpy(gPreferencesWindowBuffer,
         _preferencesFrmImages[PREFERENCES_WINDOW_FRM_BACKGROUND].getData(),
         static_cast<size_t>(_preferencesFrmImages[PREFERENCES_WINDOW_FRM_BACKGROUND].getWidth()) * _preferencesFrmImages[PREFERENCES_WINDOW_FRM_BACKGROUND].getHeight());

@@ -12,6 +12,7 @@
 #include "game_mouse.h"
 #include "game_sound.h"
 #include "geometry.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "interface.h"
 #include "memory.h"
@@ -122,6 +123,8 @@ int displayMonitorInit()
         if (gDisplayMonitorBackgroundFrmData == nullptr) {
             return -1;
         }
+        // HD UI: a piece of the bar art, copied into the bar before every redraw.
+        hd::uiScratchRegister(gDisplayMonitorBackgroundFrmData, DISPLAY_MONITOR_WIDTH, DISPLAY_MONITOR_HEIGHT);
 
         if (gInterfaceBarIsCustom) {
             _intface_full_width = gInterfaceBarWidth;
@@ -134,6 +137,7 @@ int displayMonitorInit()
         } else {
             FrmImage backgroundFrmImage;
             if (!backgroundFrmImage.lock(InterfaceFrameId::MainInterface)) {
+                hd::uiScratchFree(gDisplayMonitorBackgroundFrmData);
                 internal_free(gDisplayMonitorBackgroundFrmData);
                 return -1;
             }
@@ -223,6 +227,7 @@ void displayMonitorExit()
         // SFALL
         consoleFileExit();
 
+        hd::uiScratchFree(gDisplayMonitorBackgroundFrmData);
         internal_free(gDisplayMonitorBackgroundFrmData);
         gDisplayMonitorInitialized = false;
     }

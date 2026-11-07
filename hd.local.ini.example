@@ -1,0 +1,11 @@
+; Dustlight local machine config.
+; Copy to hd.local.ini (git-ignored) and adjust the paths.
+; Read by tools/scripts/*.ps1 and, later, tools/pipeline and tools/voice.
+
+[paths]
+; Pristine game install. Scripts only ever read from it.
+pristine=X:\path\to\Fallout 2 English
+; Working copy the game runs from. Saves and config are written here.
+working_copy=X:\path\to\fallout2-work
+; Captures, pipeline cache, HD assets and voice output.
+data_root=X:\path\to\fo2hd-data

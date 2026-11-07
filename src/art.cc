@@ -15,6 +15,7 @@
 #include "debug.h"
 #include "draw.h"
 #include "game.h"
+#include "hd/ui_recorder.h"
 #include "memory.h"
 #include "proto.h"
 #include "settings.h"
@@ -170,7 +171,11 @@ int artInit()
     };
 
     CacheReadProc* artCacheReadDataImpl = [](int fid, int* sizePtr, unsigned char* data) {
-        return artCacheReadData(FrmId(fid), sizePtr, data);
+        int rc = artCacheReadData(FrmId(fid), sizePtr, data);
+        if (rc == 0 && *sizePtr > 0) {
+            hd::uiArtLoaded(data, static_cast<size_t>(*sizePtr), fid, nullptr);
+        }
+        return rc;
     };
 
     int cacheSize = settings.system.art_cache_size;
@@ -1035,6 +1040,7 @@ static int artCacheReadData(const FrmId& frmId, int* sizePtr, unsigned char* dat
 // 0x419C80
 static void artCacheFreeImpl(void* ptr)
 {
+    hd::uiArtFreed(ptr);
     internal_free(ptr);
 }
 
@@ -1394,20 +1400,21 @@ Art* artLoad(const char* path)
         return nullptr;
     }
 
+    Art* art;
     if (artPathHasExtension(path, ".png")) {
-        return artLoadIndexedPng(path);
+        art = artLoadIndexedPng(path);
+    } else if (artPathHasExtension(path, ".pcx")) {
+        art = artLoadPcx(path);
+    } else {
+        art = artLoadFrm(path);
     }
 
-    if (artPathHasExtension(path, ".pcx")) {
-        return artLoadPcx(path);
-    }
-
-    Art* art = artLoadFrm(path);
+    // Named art for the HD UI (P7b.4: the f2_res interface bar and its side
+    // panels come this way). Whoever frees it calls hd::uiArtFreed first.
     if (art != nullptr) {
-        return art;
+        hd::uiArtLoaded(art, static_cast<size_t>(std::max(artGetDataSize(art), 0)), -1, path);
     }
-
-    return nullptr;
+    return art;
 }
 
 static Art* artLoadLocalized(const char* path)
@@ -1592,6 +1599,7 @@ static int paddingForSize(int size)
 class NamedCacheEntry {
 public:
     explicit NamedCacheEntry(ArtPtr&& art);
+    ~NamedCacheEntry() { hd::uiArtFreed(_art.get()); }
 
     const Art* art() const { return _art.get(); }
 
@@ -1616,6 +1624,7 @@ std::shared_ptr<NamedCacheEntry> artLockNamedFrameData(const char* path)
 
     Art* art = artLoadLocalized(path);
     if (!art) return nullptr;
+    hd::uiArtLoaded(art, static_cast<size_t>(std::max(artGetDataSize(art), 0)), -1, path);
 
     if (gNamedArtCacheMruCounter == UINT_MAX) {
         // This looks complicated, but it should happen rarely and needed to preserve mru order.

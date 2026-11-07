@@ -18,6 +18,7 @@
 #include "draw.h"
 #include "game.h"
 #include "game_mouse.h"
+#include "hd/draw_recorder.h"
 #include "item.h"
 #include "light.h"
 #include "map.h"
@@ -839,6 +840,7 @@ void _obj_render_pre_roof(Rect* rect, MapElevation elevation)
 
     outlinedObjects.clear();
 
+    hd::recordPass(hd::DrawPass::FlatObjects);
     int renderCount = 0;
     for (int i = 0; i < gObjectsUpdateAreaHexSize; i++) {
         int offsetIndex = _orderTable[parity][i];
@@ -882,8 +884,10 @@ void _obj_render_pre_roof(Rect* rect, MapElevation elevation)
         }
     }
 
+    hd::recordPass(hd::DrawPass::EdgeSquaresUnder);
     tileRenderEdgeBlackSquares(&updatedRect, elevation, false);
 
+    hd::recordPass(hd::DrawPass::Objects);
     for (int i = 0; i < renderCount; i++) {
         int lightIntensity = ambientIntensity;
 
@@ -913,6 +917,7 @@ void _obj_render_pre_roof(Rect* rect, MapElevation elevation)
         }
     }
 
+    hd::recordPass(hd::DrawPass::EdgeSquaresOver);
     tileRenderEdgeBlackSquares(&updatedRect, elevation, true);
 }
 
@@ -928,12 +933,15 @@ void _obj_render_post_roof(Rect* rect, MapElevation elevation)
         return;
     }
 
+    hd::recordPass(hd::DrawPass::Outlines);
     for (Object* object : outlinedObjects) {
         objectDrawOutline(object, &updatedRect);
     }
 
+    hd::recordPass(hd::DrawPass::Text);
     textObjectsRenderInRect(&updatedRect);
 
+    hd::recordPass(hd::DrawPass::Overlay);
     ObjectListNode* objectListNode = gObjectListHead;
     while (objectListNode != nullptr) {
         Object* object = objectListNode->obj;
@@ -2221,6 +2229,13 @@ void _obj_remove_all()
     _obj_last_elev = ELEVATION_INVALID;
     _obj_last_is_empty = true;
     _obj_last_roof_x = -1;
+}
+
+// Dustlight: the objects on a hex (all elevations), for readers that
+// must not disturb the objectFind* iterators (src/hd/light_scene.cc).
+ObjectListNode* objectListAtTile(int tile)
+{
+    return tile >= 0 && tile < HEX_GRID_SIZE ? gObjectListHeadByTile[tile] : nullptr;
 }
 
 // 0x48B3A8 obj_find_first
@@ -4791,6 +4806,12 @@ static void objectDrawOutline(Object* object, Rect* rect)
     rectIntersection(&expandedRect, &gObjectsWindowRect, &expandedRect);
 
     if (rectIntersection(&objectRect, &expandedRect, &objectRect) == 0) {
+        hd::recordOutline(object, FrmId(object).fid(), frameWidth, frameHeight, expandedRect);
+        if (hd::gDrawEmitOnly) {
+            artUnlock(cacheEntry);
+            return;
+        }
+
         visibleFrameRect.left += objectRect.left - object->sx;
         visibleFrameRect.top += objectRect.top - object->sy;
         visibleFrameRect.right = visibleFrameRect.left + (objectRect.right - objectRect.left);
@@ -5049,6 +5070,8 @@ static void _obj_render_object(Object* object, Rect* rect, int light)
         return;
     }
 
+    hd::recordObject(object, frmId.fid(), frameWidth, frameHeight, *rect, light);
+
     unsigned char* src = artGetFrameData(art, object->frame, object->rotation);
     unsigned char* src2 = src;
     int v50 = objectRect.left - object->sx;
@@ -5058,12 +5081,14 @@ static void _obj_render_object(Object* object, Rect* rect, int light)
     int objectHeight = objectRect.bottom - objectRect.top + 1;
 
     if (type == OBJ_TYPE_INTERFACE) {
-        blitBufferToBufferTrans(src,
-            objectWidth,
-            objectHeight,
-            frameWidth,
-            gObjectsWindowBuffer + gObjectsWindowPitch * objectRect.top + objectRect.left,
-            gObjectsWindowPitch);
+        if (!hd::gDrawEmitOnly) {
+            blitBufferToBufferTrans(src,
+                objectWidth,
+                objectHeight,
+                frameWidth,
+                gObjectsWindowBuffer + gObjectsWindowPitch * objectRect.top + objectRect.left,
+                gObjectsWindowPitch);
+        }
         artUnlock(cacheEntry);
         return;
     }
@@ -5133,6 +5158,13 @@ static void _obj_render_object(Object* object, Rect* rect, int light)
                 gEgg->sx = eggRect.left;
                 gEgg->sy = eggRect.top;
 
+                hd::recordObjectEgg(FrmId(gEgg).fid(), eggRect);
+                if (hd::gDrawEmitOnly) {
+                    artUnlock(eggHandle);
+                    artUnlock(cacheEntry);
+                    return;
+                }
+
                 Rect updatedEggRect;
                 if (rectIntersection(&eggRect, &objectRect, &updatedEggRect) == 0) {
                     Rect rects[4];
@@ -5184,6 +5216,12 @@ static void _obj_render_object(Object* object, Rect* rect, int light)
                 artUnlock(eggHandle);
             }
         }
+    }
+
+    // HD emitter: recorded above, nothing to blit (src/hd/draw_recorder.h).
+    if (hd::gDrawEmitOnly) {
+        artUnlock(cacheEntry);
+        return;
     }
 
     switch (object->flags & OBJECT_FLAG_0xFC000) {

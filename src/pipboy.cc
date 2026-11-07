@@ -23,6 +23,8 @@
 #include "game_movie.h"
 #include "game_sound.h"
 #include "geometry.h"
+#include "hd/hd.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "interface.h"
 #include "kb.h"
@@ -521,7 +523,8 @@ static void renderNavigationButtons(int _view_page, int totalPages, bool isSubPa
 // 0x497004
 int pipboyOpen(int intent)
 {
-    if (!wmMapPipboyActive() && !pipboy_available_at_game_start) {
+    // HD: the UI walk (P7b) loads a save from before the vault suit.
+    if (!wmMapPipboyActive() && !pipboy_available_at_game_start && !hd::uiWalk()) {
         // You aren't wearing the pipboy!
         const char* text = getmsg(&gMiscMessageList, &gPipboyMessageListItem, 7000);
         showDialogBox(text, nullptr, 0, 192, 135, COLOR_AMBER, nullptr, COLOR_AMBER, 1);
@@ -704,6 +707,7 @@ static int pipboyWindowInit(int intent)
     }
 
     gPipboyWindowBuffer = windowGetBuffer(gPipboyWindow);
+    hd::uiRecordFrameCopy(gPipboyWindowBuffer, _pipboyFrmImages[PIPBOY_FRM_BACKGROUND].getData(), PIPBOY_WINDOW_WIDTH, PIPBOY_WINDOW_HEIGHT);
     memcpy(gPipboyWindowBuffer, _pipboyFrmImages[PIPBOY_FRM_BACKGROUND].getData(), PIPBOY_WINDOW_WIDTH * PIPBOY_WINDOW_HEIGHT);
 
     pipboyDrawNumber(gameTimeGetHour(), 4, PIPBOY_WINDOW_TIME_X, PIPBOY_WINDOW_TIME_Y);

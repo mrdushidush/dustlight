@@ -1,0 +1,38 @@
+[project]
+name = "fo2hd"
+version = "0.1.0"
+description = "Dustlight's offline asset pipeline (PLAN.md section 3.5)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy>=2.1",
+    "pillow>=11",
+    # GPU models (upscalers, normal/depth estimation). CUDA 13 wheels support
+    # the RTX 5060 Ti (Blackwell, sm_120).
+    "torch==2.14.1",
+    "torchvision",
+    "spandrel>=0.4",
+    "opencv-python-headless>=4.10",
+    "imageio>=2.35",
+]
+
+[project.scripts]
+fo2hd = "fo2hd.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["fo2hd"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu130" }]
+torchvision = [{ index = "pytorch-cu130" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true

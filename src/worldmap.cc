@@ -31,6 +31,7 @@
 #include "game_mouse.h"
 #include "game_movie.h"
 #include "game_sound.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "interface.h"
 #include "item.h"
@@ -6192,6 +6193,9 @@ static int wmInterfaceDrawCircleOverlay(CityInfo* city, CitySizeDescription* cit
 static void wmInterfaceDrawSubTileRectFogged(unsigned char* dest, int width, int height, int pitch)
 {
     int skipY = pitch - width;
+
+    // HD: the HD UI dims the HD terrain the same way (P7b.4).
+    hd::uiRecordDim(dest, pitch, width, height, 75);
 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {

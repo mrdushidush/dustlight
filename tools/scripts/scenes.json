@@ -1,0 +1,8 @@
+[
+    { "name": "temple_indoor", "map": "arcaves.map", "elevation": 0, "settle_ms": 2000 },
+    { "name": "temple_outdoor", "map": "artemple.map", "time": 1200, "settle_ms": 2000 },
+    { "name": "arroyo_day", "map": "arvillag.map", "time": 1300, "settle_ms": 2000 },
+    { "name": "newreno_night", "map": "newr1.map", "time": 2300, "settle_ms": 2000 },
+    { "name": "arroyo_night", "map": "arvillag.map", "time": 2300, "settle_ms": 2000 },
+    { "name": "den_night", "map": "denbus1.map", "time": 2300, "settle_ms": 2000 }
+]

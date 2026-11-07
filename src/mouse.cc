@@ -747,6 +747,13 @@ void mouseGetRect(Rect* rect)
     rect->bottom = gMouseCursorHeight + gMouseCursorY - 1;
 }
 
+void mouseGetCursorImage(const unsigned char** shape, int* pitch, unsigned char* transparent)
+{
+    *shape = _mouse_shape;
+    *pitch = gMouseCursorPitch;
+    *transparent = static_cast<unsigned char>(_mouse_trans);
+}
+
 // 0x4CA9DC
 void mouseGetPosition(int* xPtr, int* yPtr)
 {

@@ -278,6 +278,15 @@ void windowRefreshAll(Rect* rect);
 void _win_get_mouse_buf(unsigned char* dest);
 bool windowIsValidWindowId(int win);
 Window* windowGetWindow(int win);
+
+// HD: windows in z-order, bottom first (src/hd/map_layer.cc composites the
+// GPU map under the windows above it).
+int windowGetCount();
+Window* windowGetWindowAt(int index);
+
+// HD: composes every window in `rect` into `dest` (pitch = rect width), as
+// the screen shows them minus the cursor. For the map layer's self-test.
+void windowRenderAllToBuffer(Rect* rect, unsigned char* dest);
 unsigned char* windowGetBuffer(int win);
 Buffer2D windowGetBuffer2D(int win);
 int windowGetAtPoint(int x, int y);

@@ -6,6 +6,7 @@
 #include "color.h"
 #include "debug.h"
 #include "draw.h"
+#include "hd/draw_recorder.h"
 #include "input.h"
 #include "memory.h"
 #include "object.h"
@@ -318,6 +319,10 @@ void textObjectsRenderInRect(Rect* rect)
         textObjectRect.right = textObject->width + textObject->x - 1;
         textObjectRect.bottom = textObject->height + textObject->y - 1;
         if (rectIntersection(&textObjectRect, rect, &textObjectRect) == 0) {
+            hd::recordText(textObject->x, textObject->y, textObject->width, textObject->height, textObject->data, *rect);
+            if (hd::gDrawEmitOnly) {
+                continue;
+            }
             blitBufferToBufferTrans(textObject->data + textObject->width * (textObjectRect.top - textObject->y) + (textObjectRect.left - textObject->x),
                 textObjectRect.right - textObjectRect.left + 1,
                 textObjectRect.bottom - textObjectRect.top + 1,

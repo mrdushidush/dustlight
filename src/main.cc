@@ -20,6 +20,7 @@
 #include "game_mouse.h"
 #include "game_movie.h"
 #include "game_sound.h"
+#include "hd/hd.h"
 #include "input.h"
 #include "kb.h"
 #include "loadsave.h"
@@ -92,6 +93,24 @@ int falloutMain(int argc, char** argv)
     }
 
     mainParseCommandLineArguments(argc, argv);
+
+    // HD: scripted capture mode loads a map, captures and quits, without
+    // menus or movies (src/hd/hd.h, PLAN.md P1.3).
+    if (hd::scriptedCaptureRequested()) {
+        int exitCode;
+        if (hd::scriptedPlayRequested()) {
+            // The real game loop on the capture's map (the combat benchmark).
+            exitCode = hd::prepareScriptedPlay(_main_load_new);
+            if (exitCode == 0) {
+                mainRunGameLoopAndCleanup();
+            }
+        } else {
+            exitCode = hd::runScriptedCapture(_main_load_new);
+        }
+        main_exit_system();
+        autorunMutexClose();
+        return exitCode;
+    }
 
     // SFALL: Allow to skip intro movies
     int skipOpeningMovies = settings.ui.skip_opening_movies;

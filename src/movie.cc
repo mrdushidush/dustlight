@@ -9,6 +9,7 @@
 #include "debug.h"
 #include "draw.h"
 #include "geometry.h"
+#include "hd/d3d11_presenter.h"
 #include "input.h"
 #include "memory_manager.h"
 #include "movie_effect.h"
@@ -65,6 +66,8 @@ static MovieDirectOverlay movieDirectOverlay;
 
 static void movieDirectOverlayDestroy()
 {
+    hd::presenterOverlayDestroy();
+
     if (movieDirectOverlay.texture != nullptr) {
         SDL_DestroyTexture(movieDirectOverlay.texture);
         movieDirectOverlay.texture = nullptr;
@@ -79,6 +82,16 @@ static void movieDirectOverlayDestroy()
 
 static bool movieDirectOverlayEnsureTexture(int width, int height)
 {
+    // HD: with the D3D11 presenter, it owns the overlay texture.
+    if (hd::presenterActive()) {
+        if (!hd::presenterOverlayEnsure(width, height)) {
+            return false;
+        }
+        movieDirectOverlay.srcWidth = width;
+        movieDirectOverlay.srcHeight = height;
+        return true;
+    }
+
     if (movieDirectOverlay.texture != nullptr
         && movieDirectOverlay.srcWidth == width
         && movieDirectOverlay.srcHeight == height) {
@@ -104,7 +117,7 @@ static bool movieDirectOverlayEnsureTexture(int width, int height)
 
 static void movieDirectOverlayUpload(unsigned char* pixels, int srcWidth, int srcHeight)
 {
-    if (movieDirectOverlay.texture == nullptr || gSdlSurface == nullptr || gSdlSurface->format == nullptr || gSdlSurface->format->palette == nullptr) {
+    if ((movieDirectOverlay.texture == nullptr && !hd::presenterActive()) || gSdlSurface == nullptr || gSdlSurface->format == nullptr || gSdlSurface->format->palette == nullptr) {
         return;
     }
 
@@ -130,6 +143,11 @@ static void movieDirectOverlayUpload(unsigned char* pixels, int srcWidth, int sr
                 | (static_cast<uint32_t>(color.g) << 8)
                 | static_cast<uint32_t>(color.b);
         }
+    }
+
+    if (hd::presenterActive()) {
+        hd::presenterOverlayUpload(movieDirectOverlay.uploadBuffer.data(), width, height, width * static_cast<int>(sizeof(uint32_t)));
+        return;
     }
 
     SDL_Rect rect = { 0, 0, width, height };
@@ -317,6 +335,11 @@ static void movieDirectImpl(unsigned char* pixels, int src_width, int src_height
 
 void movieRenderDirectOverlay()
 {
+    if (hd::presenterActive()) {
+        hd::presenterOverlaySet(movieDirectOverlay.active, movieDirectOverlay.dstRect);
+        return;
+    }
+
     if (!movieDirectOverlay.active || movieDirectOverlay.texture == nullptr) {
         return;
     }

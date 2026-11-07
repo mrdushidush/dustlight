@@ -3,6 +3,7 @@
 
 #include "color.h"
 #include "draw.h"
+#include "hd/ui_recorder.h"
 
 #include <algorithm>
 
@@ -47,7 +48,9 @@ extern FontManagerGetMonospacedCharacterWidth* fontGetMonospacedCharacterWidth;
 inline void fontDrawText(unsigned char* buffer, const char* string, int length, int pitch, ColorWithFlags color)
 {
     if (fontDrawTextPtr != nullptr) {
+        hd::uiRecordTextBefore(buffer, pitch, string, length, color);
         fontDrawTextPtr(buffer, string, length, pitch, color);
+        hd::uiRecordText(buffer, pitch, string, length, color);
     }
 }
 

@@ -1,0 +1,219 @@
+[
+ {
+  "name": "arvillag_e0_0",
+  "place": "Arroyo",
+  "map": "arvillag.map",
+  "elevation": 0,
+  "tile": 20517,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "artemple_e0_2",
+  "place": "Temple of Trials",
+  "map": "artemple.map",
+  "elevation": 0,
+  "tile": 19265,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "klamall_e0_0",
+  "place": "Klamath",
+  "map": "klamall.map",
+  "elevation": 0,
+  "tile": 28291,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "denbus1_e0_2",
+  "place": "The Den",
+  "map": "denbus1.map",
+  "elevation": 0,
+  "tile": 30109,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "modgard_e0_2",
+  "place": "Modoc",
+  "map": "modgard.map",
+  "elevation": 0,
+  "tile": 26883,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "vctycocl_e0_1",
+  "place": "Vault City",
+  "map": "vctycocl.map",
+  "elevation": 0,
+  "tile": 16463,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "geckpwpl_e0_1",
+  "place": "Gecko",
+  "map": "geckpwpl.map",
+  "elevation": 0,
+  "tile": 16101,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "broken1_e0_0",
+  "place": "Broken Hills",
+  "map": "broken1.map",
+  "elevation": 0,
+  "tile": 18954,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "newr2_e0_0",
+  "place": "New Reno",
+  "map": "newr2.map",
+  "elevation": 0,
+  "tile": 20100,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "redment_e0_1",
+  "place": "Redding",
+  "map": "redment.map",
+  "elevation": 0,
+  "tile": 24087,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "ncr2_e0_1",
+  "place": "NCR",
+  "map": "ncr2.map",
+  "elevation": 0,
+  "tile": 22481,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "vault13_e0_1",
+  "place": "Vault 13",
+  "map": "vault13.map",
+  "elevation": 0,
+  "tile": 24077,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "navarro_e0_1",
+  "place": "Navarro",
+  "map": "navarro.map",
+  "elevation": 0,
+  "tile": 24089,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "sftanker_e1_2",
+  "place": "San Francisco",
+  "map": "sftanker.map",
+  "elevation": 1,
+  "tile": 23659,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "gstfarm_e0_2",
+  "place": "Ghost Farm",
+  "map": "gstfarm.map",
+  "elevation": 0,
+  "tile": 18463,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "temple_indoor_0",
+  "place": "Temple of Trials, inside",
+  "map": "arcaves.map",
+  "elevation": 0,
+  "tile": -1,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\""
+  ]
+ },
+ {
+  "name": "arroyo_night_0",
+  "place": "Arroyo at night",
+  "map": "arvillag.map",
+  "elevation": 0,
+  "tile": -1,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\"",
+   "\"[hd_debug]capture_time=2300\""
+  ]
+ },
+ {
+  "name": "newreno_night_0",
+  "place": "New Reno at night",
+  "map": "newr1.map",
+  "elevation": 0,
+  "tile": -1,
+  "crop_x": 2200,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\"",
+   "\"[hd_debug]capture_time=2300\""
+  ]
+ },
+ {
+  "name": "newr2_club_night_0",
+  "place": "New Reno, the club at night",
+  "map": "newr2.map",
+  "elevation": 0,
+  "tile": 20100,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\"",
+   "\"[hd_debug]capture_time=2300\""
+  ]
+ },
+ {
+  "name": "den_fire_night_0",
+  "place": "The Den at night",
+  "map": "denbus1.map",
+  "elevation": 0,
+  "tile": 24350,
+  "crop_x": 240,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\"",
+   "\"[hd_debug]capture_time=2300\""
+  ]
+ },
+ {
+  "name": "vcity_park_night_0",
+  "place": "Vault City at night",
+  "map": "vctycocl.map",
+  "elevation": 0,
+  "tile": 16463,
+  "extra": [
+   "\"[hd_debug]capture_no_cursor=1\"",
+   "\"[hd_debug]capture_time=2300\""
+  ]
+ }
+]

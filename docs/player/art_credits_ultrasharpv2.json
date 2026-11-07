@@ -1,0 +1,13 @@
+{
+ "art_models": ["4x-UltraSharpV2.safetensors"],
+ "credits": [
+  {
+   "name": "4x-UltraSharpV2",
+   "author": "Kim2091",
+   "license": "CC-BY-NC-SA-4.0",
+   "use": "upscaled all of the art and the fonts",
+   "note": "Used with Kim2091's permission for this free mod: https://github.com/Kim2091/Kim2091-Models/issues/6 . Model: https://github.com/Kim2091/Kim2091-Models . Support Kim2091's work: https://ko-fi.com/J3J3BCC3L"
+  }
+ ],
+ "art_terms": "The HD art is made with 4x-UltraSharpV2 and shared with the permission of the model's author, Kim2091, on the condition that the mod stays free and the author is credited (https://github.com/Kim2091/Kim2091-Models/issues/6). The model's own license is CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/). Please don't sell this art or use it in anything paid."
+}

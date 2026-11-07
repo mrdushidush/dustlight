@@ -1,0 +1,17 @@
+{
+ "art_models": ["4x-PBRify-UpscalerV4.pth", "4x-DD3-PBRify-UpscalerV4.chain"],
+ "credits": [
+  {
+   "name": "4x-PBRify-UpscalerV4",
+   "author": "Kim2091",
+   "license": "CC0-1.0",
+   "use": "upscaled all of the art"
+  },
+  {
+   "name": "1x-DitherDeleterV3-Smooth",
+   "author": "mutin-choler",
+   "license": "WTFPL",
+   "use": "removed the dither from the interface art, talking heads and fonts before upscaling"
+  }
+ ]
+}

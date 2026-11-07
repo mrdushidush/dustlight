@@ -10,6 +10,7 @@
 #include "debug.h"
 #include "dinput.h"
 #include "draw.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "memory.h"
 #include "mouse.h"
@@ -430,6 +431,7 @@ void windowDestroy(int win)
     rectCopy(&rect, &(window->rect));
 
     int windowIndex = gWindowIndexes[window->id];
+    hd::uiWindowDestroyed(win);
     windowFree(win);
 
     gWindowIndexes[win] = -1;
@@ -1139,6 +1141,27 @@ Window* windowGetWindow(int win)
 
     int index = gWindowIndexes[win];
     if (index == -1) {
+        return nullptr;
+    }
+
+    return gWindows[index];
+}
+
+int windowGetCount()
+{
+    return gWindowsLength;
+}
+
+void windowRenderAllToBuffer(Rect* rect, unsigned char* dest)
+{
+    if (gWindowSystemInitialized) {
+        _refresh_all(rect, dest);
+    }
+}
+
+Window* windowGetWindowAt(int index)
+{
+    if (index < 0 || index >= gWindowsLength) {
         return nullptr;
     }
 

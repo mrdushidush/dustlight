@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "debug.h"
+#include "hd/ui_recorder.h"
 #include "memory.h"
 
 namespace fallout {
@@ -468,6 +469,9 @@ bool heapBlockDeallocate(Heap* heap, int* handleIndexPtr)
 
     int size = blockHeader->size;
 
+    // The HD UI's record of art at this address goes with the block.
+    hd::uiArtFreed(handle->data + HEAP_BLOCK_HEADER_SIZE);
+
     if (handle->state == HEAP_BLOCK_STATE_MOVABLE) {
         // Unbind block from handle and mark it as free.
         blockHeader->handle_index = -1;
@@ -895,6 +899,7 @@ static bool heapFindFreeBlock(Heap* heap, int size, void** blockPtr, int disallo
 
         memcpy(freeBlock, moveableBlock, moveableBlockSize + HEAP_BLOCK_OVERHEAD_SIZE);
         heap->handles[freeBlockHeader->handle_index].data = freeBlock;
+        hd::uiArtMoved(moveableBlock + HEAP_BLOCK_HEADER_SIZE, freeBlock + HEAP_BLOCK_HEADER_SIZE);
 
         // Calculate remaining size of the free block after moving.
         int remainingSize = freeBlockSize - moveableBlockSize;

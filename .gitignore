@@ -412,3 +412,73 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 opencode.json
+# ---------------------------------------------------------------------------
+# Dustlight (PROJECT_BRIEF §8): never commit game data or anything derived
+# from it. tools/git-hooks/check-staged.sh enforces the same list on commit.
+# ---------------------------------------------------------------------------
+
+# Local machine config (paths to the game install, working copy, data root)
+/hd.local.ini
+/hd.release.ini
+/hd.release-*.ini
+/hd.local.manifest.json
+
+# Game data formats
+*.dat
+*.frm
+*.fr[0-5]
+*.pal
+*.msg
+*.map
+*.acm
+*.int
+*.lip
+*.aaf
+*.fon
+*.mve
+*.gam
+*.pro
+*.lst
+*.sve
+*.sav
+*.rix
+
+# Images, audio, video (screenshots and extracted/upscaled art count as derived)
+*.png
+*.jpeg
+*.jpg
+*.gif
+*.bmp
+*.tga
+*.webp
+*.dds
+*.ktx
+*.ktx2
+*.exr
+*.psd
+*.wav
+*.ogg
+*.mp3
+*.flac
+*.mp4
+*.webm
+*.avi
+
+# ML models and pipeline databases
+*.onnx
+*.pth
+*.pt
+*.safetensors
+*.ckpt
+*.gguf
+*.sqlite
+*.db
+
+# Python environments
+.venv/
+
+# Upstream's own assets (CE's files, not game data) stay tracked
+!/docs/images/**
+!/files/**
+!/os/**
+!/sfall_testing/**

@@ -66,6 +66,10 @@ void _mouse_simulate_input(int delta_x, int delta_y, MouseButtonEvent buttons);
 bool _mouse_in(int left, int top, int right, int bottom);
 bool _mouse_click_in(int left, int top, int right, int bottom);
 void mouseGetRect(Rect* rect);
+
+// HD: the cursor image at mouseGetRect, pixels equal to `transparent` show
+// what is under it (src/hd/map_layer.cc).
+void mouseGetCursorImage(const unsigned char** shape, int* pitch, unsigned char* transparent);
 void mouseGetPosition(int* out_x, int* out_y);
 void _mouse_set_position(int x, int y);
 MouseButtonEvent mouseGetEvent();

@@ -22,6 +22,10 @@ set(CMAKE_CXX_EXTENSIONS NO)
 
 if(MSVC)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/EHsc>)
+    # Dustlight: this PC's paths stay out of the exe. __FILE__ loses the source folder here;
+    # the pdb path is the exe's link option /PDBALTPATH below (fo2hd release checks both).
+    file(TO_NATIVE_PATH "${CMAKE_SOURCE_DIR}" HD_SOURCE_DIR_NATIVE)
+    add_compile_options("/d1trimfile:${HD_SOURCE_DIR_NATIVE}")
 endif()
 
 option(FALLOUT_VENDORED "Use vendored third-party libraries" ON)
@@ -329,6 +333,58 @@ set(FALLOUT_PLATFORM_SOURCES
     "src/touch.h"
     "src/scan_unimplemented.cc"
 	"third_party/lodepng/lodepng.cpp"
+    # Dustlight module (PLAN.md section 3.6). Upstream files call it
+    # through src/hd/hd.h and src/hd/draw_recorder.h only.
+    "src/hd/capture.cc"
+    "src/hd/capture.h"
+    "src/hd/cycle_scan.cc"
+    "src/hd/cycle_scan.h"
+    "src/hd/d3d11_presenter.cc"
+    "src/hd/d3d11_presenter.h"
+    "src/hd/d3d11_shared.h"
+    "src/hd/draw_list.h"
+    "src/hd/draw_recorder.cc"
+    "src/hd/draw_recorder.h"
+    "src/hd/first_run.cc"
+    "src/hd/first_run.h"
+    "src/hd/hd.cc"
+    "src/hd/hd.h"
+    "src/hd/hd_art.cc"
+    "src/hd/hd_art.h"
+    "src/hd/json_reader.cc"
+    "src/hd/json_reader.h"
+    "src/hd/json_writer.cc"
+    "src/hd/json_writer.h"
+    "src/hd/light_scene.cc"
+    "src/hd/light_scene.h"
+    "src/hd/map_layer.cc"
+    "src/hd/map_layer.h"
+    "src/hd/map_lighting.cc"
+    "src/hd/map_lighting.h"
+    "src/hd/map_post.cc"
+    "src/hd/map_post.h"
+    "src/hd/map_renderer.cc"
+    "src/hd/map_renderer.h"
+    "src/hd/release_info.h"
+    "src/hd/palette_fit.cc"
+    "src/hd/palette_fit.h"
+    "src/hd/present_stats.cc"
+    "src/hd/present_stats.h"
+    "src/hd/sprite_shape.cc"
+    "src/hd/sprite_shape.h"
+    "src/hd/ui_layer.cc"
+    "src/hd/ui_layer.h"
+    "src/hd/ui_recorder.cc"
+    "src/hd/ui_recorder.h"
+    "src/hd/ui_text.cc"
+    "src/hd/ui_text.h"
+    # Dear ImGui for the developer overlay (ADR-0008).
+    "third_party/imgui/imgui.cpp"
+    "third_party/imgui/imgui_draw.cpp"
+    "third_party/imgui/imgui_tables.cpp"
+    "third_party/imgui/imgui_widgets.cpp"
+    "third_party/imgui/backends/imgui_impl_dx11.cpp"
+    "third_party/imgui/backends/imgui_impl_sdl2.cpp"
 )
 
 target_sources(${EXECUTABLE_NAME} PUBLIC
@@ -340,6 +396,9 @@ target_sources(${EXECUTABLE_NAME} PUBLIC
 target_sources(${EXECUTABLE_NAME} PUBLIC ${FALLOUT_PLATFORM_SOURCES})
 
 target_include_directories(${EXECUTABLE_NAME} PUBLIC "third_party/lodepng")
+# src/hd includes engine headers as "art.h" and its own as "hd/....h".
+target_include_directories(${EXECUTABLE_NAME} PRIVATE "src")
+target_include_directories(${EXECUTABLE_NAME} PRIVATE "third_party/imgui" "third_party/imgui/backends")
 
 set(FALLOUT_HAVE_STB_VORBIS OFF)
 if(FALLOUT_AUDIO_OGG)
@@ -396,6 +455,10 @@ endif()
 if(WIN32)
     target_link_libraries(${EXECUTABLE_NAME}
         winmm
+        # Dustlight D3D11 presenter (src/hd/d3d11_presenter.cc).
+        d3d11
+        dxgi
+        d3dcompiler
     )
 endif()
 
@@ -404,6 +467,7 @@ if(MSVC)
         debug libcpmtd
         optimized libcpmt
     )
+    target_link_options(${EXECUTABLE_NAME} PRIVATE "/PDBALTPATH:%_PDB%")
 endif()
 
 if(MINGW)
@@ -674,6 +738,9 @@ if((NOT ANDROID) AND (NOT IOS) AND (NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten"))
 
         target_link_libraries(mapper-ce
             winmm
+            d3d11
+            dxgi
+            d3dcompiler
         )
         
         if(MSVC)
@@ -698,6 +765,7 @@ if((NOT ANDROID) AND (NOT IOS) AND (NOT CMAKE_SYSTEM_NAME MATCHES "Emscripten"))
 
     target_include_directories(mapper-ce PUBLIC "third_party/lodepng")
     target_include_directories(mapper-ce PRIVATE "src")
+    target_include_directories(mapper-ce PRIVATE "third_party/imgui" "third_party/imgui/backends")
     target_include_directories(mapper-ce PRIVATE ${ZLIB_INCLUDE_DIRS})
     target_include_directories(mapper-ce PRIVATE ${SDL2_INCLUDE_DIRS})
 

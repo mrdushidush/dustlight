@@ -14,6 +14,7 @@
 #include "game_mouse.h"
 #include "game_sound.h"
 #include "geometry.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "interface.h"
 #include "kb.h"
@@ -597,6 +598,7 @@ static int elevatorWindowInit(int elevator)
     }
 
     gElevatorWindowBuffer = windowGetBuffer(gElevatorWindow);
+    hd::uiRecordFrameCopy(gElevatorWindowBuffer, _elevatorBackgroundFrmImage.getData(), _elevatorBackgroundFrmImage.getWidth(), _elevatorBackgroundFrmImage.getHeight());
     memcpy(gElevatorWindowBuffer, _elevatorBackgroundFrmImage.getData(), static_cast<size_t>(_elevatorBackgroundFrmImage.getWidth()) * _elevatorBackgroundFrmImage.getHeight());
 
     if (_elevatorPanelFrmImage.isLocked()) {

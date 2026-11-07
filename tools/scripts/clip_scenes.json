@@ -1,0 +1,56 @@
+[
+ {
+  "name": "arroyo_night",
+  "map": "arvillag.map",
+  "time": 2300,
+  "settle_ms": 2000,
+  "x": 759
+ },
+ {
+  "name": "den_fire",
+  "map": "denbus1.map",
+  "tile": 24350,
+  "time": 2300,
+  "settle_ms": 2000,
+  "x": 120
+ },
+ {
+  "name": "newreno_night",
+  "map": "newr1.map",
+  "time": 2300,
+  "settle_ms": 2000,
+  "x": 1518
+ },
+ {
+  "name": "reno_fire",
+  "map": "newr1.map",
+  "tile": 23123,
+  "time": 2300,
+  "settle_ms": 2000,
+  "x": 1300
+ },
+ {
+  "name": "vault_computers",
+  "map": "vctyvlt.map",
+  "elevation": 2,
+  "tile": 22872,
+  "settle_ms": 2000,
+  "x": 1000
+ },
+ {
+  "name": "sf_docks",
+  "map": "sfdock.map",
+  "tile": 23251,
+  "time": 1200,
+  "settle_ms": 2000,
+  "x": 1518
+ },
+ {
+  "name": "slime_caves",
+  "map": "klatoxcv.map",
+  "elevation": 1,
+  "tile": 17470,
+  "settle_ms": 2000,
+  "x": 1518
+ }
+]

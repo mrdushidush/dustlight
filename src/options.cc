@@ -9,6 +9,7 @@
 #include "game_mouse.h"
 #include "game_sound.h"
 #include "graph_lib.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "kb.h"
 #include "loadsave.h"
@@ -272,6 +273,9 @@ static int optionsWindowInit()
         }
 
         int buttonFrmIndex = (index % 2 == 0) ? OPTIONS_WINDOW_FRM_BUTTON_OFF : OPTIONS_WINDOW_FRM_BUTTON_ON;
+        // HD UI: a button face (art + label) the window manager copies into the window.
+        hd::uiScratchRegister(_opbtns[index], _optionsFrmImages[OPTIONS_WINDOW_FRM_BUTTON_ON].getWidth(), _optionsFrmImages[OPTIONS_WINDOW_FRM_BUTTON_ON].getHeight());
+        hd::uiRecordFrameCopy(_opbtns[index], _optionsFrmImages[buttonFrmIndex].getData(), _optionsFrmImages[OPTIONS_WINDOW_FRM_BUTTON_ON].getWidth(), _optionsFrmImages[OPTIONS_WINDOW_FRM_BUTTON_ON].getHeight());
         memcpy(_opbtns[index], _optionsFrmImages[buttonFrmIndex].getData(), static_cast<size_t>(_optionsFrmImages[OPTIONS_WINDOW_FRM_BUTTON_ON].getWidth()) * _optionsFrmImages[OPTIONS_WINDOW_FRM_BUTTON_ON].getHeight());
     }
 
@@ -302,6 +306,7 @@ static int optionsWindowInit()
     }
 
     optionsWindowBuffer = windowGetBuffer(optionsWindow);
+    hd::uiRecordFrameCopy(optionsWindowBuffer, _optionsFrmImages[OPTIONS_WINDOW_FRM_BACKGROUND].getData(), _optionsFrmImages[OPTIONS_WINDOW_FRM_BACKGROUND].getWidth(), _optionsFrmImages[OPTIONS_WINDOW_FRM_BACKGROUND].getHeight());
     memcpy(optionsWindowBuffer, _optionsFrmImages[OPTIONS_WINDOW_FRM_BACKGROUND].getData(), static_cast<size_t>(_optionsFrmImages[OPTIONS_WINDOW_FRM_BACKGROUND].getWidth()) * _optionsFrmImages[OPTIONS_WINDOW_FRM_BACKGROUND].getHeight());
 
     fontSetCurrent(103);
@@ -384,6 +389,7 @@ static void optionsWindowCleanup(bool restoreWorldState)
 
     for (int index = 0; index < optionsWindowButtonCount; index++) {
         if (_opbtns[index] != nullptr) {
+            hd::uiScratchFree(_opbtns[index]);
             internal_free(_opbtns[index]);
             _opbtns[index] = nullptr;
         }
@@ -477,6 +483,7 @@ int showPause(bool preserveWorldState)
     pauseWindow = window;
 
     unsigned char* windowBuffer = windowGetBuffer(window);
+    hd::uiRecordFrameCopy(windowBuffer, frmImages[PAUSE_WINDOW_FRM_BACKGROUND].getData(), frmImages[PAUSE_WINDOW_FRM_BACKGROUND].getWidth(), frmImages[PAUSE_WINDOW_FRM_BACKGROUND].getHeight());
     memcpy(windowBuffer,
         frmImages[PAUSE_WINDOW_FRM_BACKGROUND].getData(),
         static_cast<size_t>(frmImages[PAUSE_WINDOW_FRM_BACKGROUND].getWidth()) * frmImages[PAUSE_WINDOW_FRM_BACKGROUND].getHeight());

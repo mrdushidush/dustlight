@@ -1,6 +1,7 @@
 #include "game_config.h"
 #include "debug.h"
 #include "game_config_migration.h"
+#include "hd/hd.h"
 #include "settings.h"
 #include "sfall_config.h"
 
@@ -158,6 +159,13 @@ bool gameConfigInit(bool isMapper, int argc, char** argv)
 
     if (!isMapper && gameConfigMigrateFromF2Res(gGameConfigFilePath, &gGameConfig)) {
         debugPrint("Migrated settings from f2_res.ini.\n");
+        configWriteEx(&gGameConfig, gGameConfigFilePath, ConfigFlags::RetainAll);
+    }
+
+    // HD: first start of a release install sets the screen from the desktop
+    // and the installed HD art, once (src/hd/first_run.h). After the f2_res
+    // migration, before command-line overrides.
+    if (!isMapper && hd::firstRunScreenSetup(&gGameConfig)) {
         configWriteEx(&gGameConfig, gGameConfigFilePath, ConfigFlags::RetainAll);
     }
 

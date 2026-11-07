@@ -11,6 +11,8 @@
 #include "dinput.h"
 #include "draw.h"
 #include "game.h"
+#include "hd/d3d11_presenter.h"
+#include "hd/present_stats.h"
 #include "interface.h"
 #include "memory.h"
 #include "mouse.h"
@@ -162,9 +164,14 @@ int _init_vesa_mode(int width, int height)
 int _GNW95_init_window(int width, int height, WindowMode mode, int scale)
 {
     if (gSdlWindow == nullptr) {
-        SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+        // HD: [hd] renderer=d3d11 presents through Direct3D 11 instead of
+        // SDL_Renderer (src/hd/d3d11_presenter.h).
+        bool useD3D11 = hd::presenterRequested();
+        if (!useD3D11) {
+            SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+        }
 
-        Uint32 windowFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI;
+        Uint32 windowFlags = (useD3D11 ? 0 : SDL_WINDOW_OPENGL) | SDL_WINDOW_ALLOW_HIGHDPI;
 
         if (mode == WindowMode::Fullscreen) {
             windowFlags |= SDL_WINDOW_FULLSCREEN;
@@ -177,7 +184,12 @@ int _GNW95_init_window(int width, int height, WindowMode mode, int scale)
             return -1;
         }
 
-        if (!createRenderer(width, height)) {
+        if (useD3D11 && !hd::presenterCreate(gSdlWindow, width, height)) {
+            // The presenter logged why; fall back to SDL_Renderer.
+            SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
+        }
+
+        if (!hd::presenterActive() && !createRenderer(width, height)) {
             destroyRenderer();
 
             SDL_DestroyWindow(gSdlWindow);
@@ -250,7 +262,10 @@ void directDrawSetPaletteInRange(unsigned char* palette, int start, int count)
         }
 
         SDL_SetPaletteColors(gSdlSurface->format->palette, colors, start, count);
-        SDL_BlitSurface(gSdlSurface, nullptr, gSdlTextureSurface, nullptr);
+        if (gSdlTextureSurface != nullptr) {
+            hd::PresentTimer timer;
+            SDL_BlitSurface(gSdlSurface, nullptr, gSdlTextureSurface, nullptr);
+        }
     }
 }
 
@@ -268,7 +283,10 @@ void directDrawSetPalette(unsigned char* palette)
         }
 
         SDL_SetPaletteColors(gSdlSurface->format->palette, colors, 0, 256);
-        SDL_BlitSurface(gSdlSurface, nullptr, gSdlTextureSurface, nullptr);
+        if (gSdlTextureSurface != nullptr) {
+            hd::PresentTimer timer;
+            SDL_BlitSurface(gSdlSurface, nullptr, gSdlTextureSurface, nullptr);
+        }
     }
 }
 
@@ -308,7 +326,10 @@ void _GNW95_ShowRect(unsigned char* src, int srcPitch, int unused, int srcX, int
     SDL_Rect destRect;
     destRect.x = destX;
     destRect.y = destY;
-    SDL_BlitSurface(gSdlSurface, &srcRect, gSdlTextureSurface, &destRect);
+    if (gSdlTextureSurface != nullptr) {
+        hd::PresentTimer timer;
+        SDL_BlitSurface(gSdlSurface, &srcRect, gSdlTextureSurface, &destRect);
+    }
 }
 
 // Clears drawing surface.
@@ -326,7 +347,10 @@ void _GNW95_zero_vid_mem()
         surface += gSdlSurface->pitch;
     }
 
-    SDL_BlitSurface(gSdlSurface, nullptr, gSdlTextureSurface, nullptr);
+    if (gSdlTextureSurface != nullptr) {
+        hd::PresentTimer timer;
+        SDL_BlitSurface(gSdlSurface, nullptr, gSdlTextureSurface, nullptr);
+    }
 }
 
 int screenGetWidth()
@@ -407,6 +431,13 @@ static void destroyRenderer()
 
 void handleWindowSizeChanged()
 {
+    if (hd::presenterActive()) {
+        hd::presenterResize();
+        windowRefreshAll(&_scr_size);
+        mouseDeviceRefreshWindowMapping();
+        return;
+    }
+
     movieHandleRendererReset();
     destroyRenderer();
     if (createRenderer(screenGetWidth(), screenGetHeight())) {
@@ -474,6 +505,17 @@ void renderFpsCounter()
 
 void renderPresent()
 {
+    // HD: presentation cost of either path (src/hd/present_stats.h).
+    hd::PresentTimer timer;
+    hd::presentStatsFrame();
+
+    if (hd::presenterActive()) {
+        // Lets movie.cc hand its overlay state to the presenter.
+        movieRenderDirectOverlay();
+        hd::presenterPresent(gSdlSurface);
+        return;
+    }
+
     SDL_UpdateTexture(gSdlTexture, nullptr, gSdlTextureSurface->pixels, gSdlTextureSurface->pitch);
     SDL_RenderClear(gSdlRenderer);
     SDL_RenderCopy(gSdlRenderer, gSdlTexture, nullptr, nullptr);

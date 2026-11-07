@@ -3,6 +3,7 @@
 #include "draw.h"
 #include "game.h"
 #include "geometry.h"
+#include "hd/draw_recorder.h"
 #include "map_edge.h"
 #include "settings.h"
 #include "stdio.h"
@@ -384,6 +385,10 @@ void tile_hires_stencil_draw(Rect* rect, unsigned char* buffer, int windowWidth,
                     continue;
                 };
 
+                hd::recordFill(intersection, COLOR_FIRST);
+                if (hd::gDrawEmitOnly) {
+                    continue;
+                }
                 bufferFill(buffer + windowWidth * intersection.top + intersection.left,
                     intersection.right - intersection.left + 1,
                     intersection.bottom - intersection.top + 1,

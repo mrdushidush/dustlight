@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "color.h"
+#include "hd/ui_recorder.h"
 #include "svga.h"
 
 namespace fallout {
@@ -159,6 +160,14 @@ void blitBufferToBufferStretch(const unsigned char* src, int srcWidth, int srcHe
     int stepX = (destWidth << 16) / srcWidth;
     int stepY = (destHeight << 16) / srcHeight;
 
+    // A plain copy (the interface bar's side panels at most widths): the HD UI can draw it.
+    // Every source row also lands on its own row when the image is a row short of the window
+    // (the metal panels, hr_ifacelft1/rht1, are 640x99 in a 100-row window): the loop below
+    // never writes the last row. If the last source row ends on its own row, all of them do.
+    if (srcWidth == destWidth && ((srcHeight * stepY) >> 16) == srcHeight) {
+        hd::uiRecordCopy(dest, destPitch, src, srcPitch, srcWidth, srcHeight, false);
+    }
+
     for (int srcY = 0; srcY < srcHeight; srcY += 1) {
         int startDestY = (srcY * stepY) >> 16;
         int endDestY = ((srcY + 1) * stepY) >> 16;
@@ -183,6 +192,9 @@ void blitBufferToBufferStretch(const unsigned char* src, int srcWidth, int srcHe
 // 0x4D3560
 void blitBufferToBufferStretchTrans(const unsigned char* src, int srcWidth, int srcHeight, int srcPitch, unsigned char* dest, int destWidth, int destHeight, int destPitch)
 {
+    if (srcWidth == destWidth && srcHeight == destHeight) {
+        hd::uiRecordCopy(dest, destPitch, src, srcPitch, srcWidth, srcHeight, true);
+    }
     int stepX = (destWidth << 16) / srcWidth;
     int stepY = (destHeight << 16) / srcHeight;
 
@@ -405,6 +417,9 @@ void bufferFill(unsigned char* buf, int width, int height, int pitch, Color valu
 {
     int y;
 
+    // HD: the UI recorder notes solid fills (P7b.4).
+    hd::uiRecordFill(buf, pitch, width, height, value);
+
     for (y = 0; y < height; y++) {
         memset(buf, value, width);
         buf += pitch;
@@ -510,6 +525,7 @@ void bufferOutline(unsigned char* buf, int width, int height, int pitch, Color c
 // 0x4E0DB0
 void srcCopy(unsigned char* dest, int destPitch, const unsigned char* src, int srcPitch, int width, int height)
 {
+    hd::uiRecordCopy(dest, destPitch, src, srcPitch, width, height, false);
     for (int y = 0; y < height; y++) {
         memcpy(dest, src, width);
         dest += destPitch;
@@ -520,6 +536,7 @@ void srcCopy(unsigned char* dest, int destPitch, const unsigned char* src, int s
 // 0x4E0ED5
 void transSrcCopy(unsigned char* dest, int destPitch, const unsigned char* src, int srcPitch, int width, int height)
 {
+    hd::uiRecordCopy(dest, destPitch, src, srcPitch, width, height, true);
     int destSkip = destPitch - width;
     int srcSkip = srcPitch - width;
 

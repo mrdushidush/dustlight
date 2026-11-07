@@ -12,6 +12,7 @@
 #include "game_mouse.h"
 #include "game_sound.h"
 #include "geometry.h"
+#include "hd/ui_recorder.h"
 #include "input.h"
 #include "interface.h"
 #include "kb.h"
@@ -213,11 +214,16 @@ static int skilldexWindowInit()
             data = _skilldexFrmImages[SKILLDEX_FRM_BUTTON_ON].getData();
         }
 
+        // HD UI: a button face (art + skill name) the window manager copies into the window.
+        int frm = cycle ? SKILLDEX_FRM_BUTTON_OFF : SKILLDEX_FRM_BUTTON_ON;
+        hd::uiScratchRegister(gSkilldexButtonsData[buttonDataIndex], _skilldexFrmImages[frm].getWidth(), _skilldexFrmImages[frm].getHeight());
+        hd::uiRecordFrameCopy(gSkilldexButtonsData[buttonDataIndex], data, _skilldexFrmImages[frm].getWidth(), _skilldexFrmImages[frm].getHeight());
         memcpy(gSkilldexButtonsData[buttonDataIndex], data, size);
     }
 
     if (buttonDataIndex < SKILLDEX_SKILL_BUTTON_BUFFER_COUNT) {
         while (--buttonDataIndex >= 0) {
+            hd::uiScratchFree(gSkilldexButtonsData[buttonDataIndex]);
             internal_free(gSkilldexButtonsData[buttonDataIndex]);
         }
 
@@ -242,6 +248,7 @@ static int skilldexWindowInit()
         WINDOW_MODAL | WINDOW_DONT_MOVE_TOP);
     if (gSkilldexWindow == -1) {
         for (int index = 0; index < SKILLDEX_SKILL_BUTTON_BUFFER_COUNT; index++) {
+            hd::uiScratchFree(gSkilldexButtonsData[index]);
             internal_free(gSkilldexButtonsData[index]);
         }
 
@@ -261,6 +268,7 @@ static int skilldexWindowInit()
     gameMouseSetCursor(MOUSE_CURSOR_ARROW);
 
     gSkilldexWindowBuffer = windowGetBuffer(gSkilldexWindow);
+    hd::uiRecordFrameCopy(gSkilldexWindowBuffer, _skilldexFrmImages[SKILLDEX_FRM_BACKGROUND].getData(), _skilldexFrmImages[SKILLDEX_FRM_BACKGROUND].getWidth(), _skilldexFrmImages[SKILLDEX_FRM_BACKGROUND].getHeight());
     memcpy(gSkilldexWindowBuffer,
         _skilldexFrmImages[SKILLDEX_FRM_BACKGROUND].getData(),
         static_cast<size_t>(_skilldexFrmImages[SKILLDEX_FRM_BACKGROUND].getWidth()) * _skilldexFrmImages[SKILLDEX_FRM_BACKGROUND].getHeight());
@@ -405,6 +413,7 @@ static void skilldexWindowFree()
     windowDestroy(gSkilldexWindow);
 
     for (int index = 0; index < SKILLDEX_SKILL_BUTTON_BUFFER_COUNT; index++) {
+        hd::uiScratchFree(gSkilldexButtonsData[index]);
         internal_free(gSkilldexButtonsData[index]);
     }
 

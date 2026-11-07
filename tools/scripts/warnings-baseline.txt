@@ -1,0 +1,2 @@
+src/scan_unimplemented_opcodes.h C4477
+src/sfall_arrays.cc C4312

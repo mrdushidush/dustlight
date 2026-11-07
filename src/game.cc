@@ -29,6 +29,7 @@
 #include "game_mouse.h"
 #include "game_movie.h"
 #include "game_sound.h"
+#include "hd/hd.h"
 #include "input.h"
 #include "interface.h"
 #include "inventory.h"
@@ -426,6 +427,9 @@ int gameInitWithOptions(const char* windowTitle, bool isMapper, int font, Window
     // SFALL: Execute all code that should be executed AFTER game init
     sfallOnAfterGameInit();
 
+    // HD: reads its [hd] config section (src/hd/hd.h).
+    hd::init(isMapper);
+
     return 0;
 }
 
@@ -491,6 +495,8 @@ void gameReset()
 void gameExit()
 {
     debugPrint("\nGame Exit\n");
+
+    hd::exit();
 
     sfallOnGameModeChange(1, GameMode::getCurrentGameMode());
 
@@ -606,6 +612,11 @@ int gameHandleKey(int eventCode, bool isInCombatMode)
     }
 
     if (_gmouse_is_scrolling()) {
+        return 0;
+    }
+
+    // HD: debug hotkeys (Ctrl+F12 capture).
+    if (hd::handleKey(eventCode)) {
         return 0;
     }
 
