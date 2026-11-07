@@ -95,6 +95,9 @@ try {
 
     Invoke-Check 'upstream test: script serialization' {
         # The test compiles with GCC/Clang flags (-fsanitize=address,undefined); MSVC can't run it.
+        # GitHub's Windows machines have such a compiler, but the compiled test can't start there
+        # (exit 0xC0000135, a missing DLL), which says nothing about the code it tests.
+        if ($env:GITHUB_ACTIONS) { return 'SKIPPED (the compiled test cannot start on GitHub Windows machines)' }
         $cxx = @('clang++', 'g++') | Where-Object { Get-Command $_ -ErrorAction SilentlyContinue } | Select-Object -First 1
         if (-not $cxx) { return 'SKIPPED (needs clang++ or g++; not installed)' }
         $env:CXX = $cxx
