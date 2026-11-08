@@ -8,4 +8,8 @@
 #define HD_RELEASE_NAME "Dustlight"
 #define HD_RELEASE_VERSION "0.9.1-beta"
 
+// The same version as four numbers, for the exe's version block
+// (os/windows/fallout2-ce.rc). release.ps1 refuses to build if they disagree.
+#define HD_RELEASE_VERSION_NUMBERS 0, 9, 1, 0
+
 #endif /* FALLOUT_HD_RELEASE_INFO_H_ */

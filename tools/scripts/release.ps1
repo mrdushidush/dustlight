@@ -34,6 +34,11 @@ $info = Get-Content -Raw (Join-Path $script:RepoRoot 'src\hd\release_info.h')
 if ($Name -eq '') { $Name = [regex]::Match($info, '#define HD_RELEASE_NAME "([^"]+)"').Groups[1].Value }
 if ($Version -eq '') { $Version = [regex]::Match($info, '#define HD_RELEASE_VERSION "([^"]+)"').Groups[1].Value }
 if ($Name -eq '' -or $Version -eq '') { throw 'No name/version (src/hd/release_info.h).' }
+$numbers = [regex]::Match($info, '#define HD_RELEASE_VERSION_NUMBERS ([0-9, ]+)').Groups[1].Value -replace ' ', ''
+$fromText = [regex]::Match($Version, '^(\d+)\.(\d+)\.(\d+)')
+if ($numbers -ne "$($fromText.Groups[1].Value),$($fromText.Groups[2].Value),$($fromText.Groups[3].Value),0") {
+    throw "HD_RELEASE_VERSION_NUMBERS ($numbers) doesn't match $Version (src/hd/release_info.h)."
+}
 $data = (Get-HdPaths)['data_root'].TrimEnd('\')
 if ($HdPack -eq '') { $HdPack = Join-Path $data 'hdpack' }
 if (-not (Test-Path (Join-Path $HdPack 'art'))) { throw "No art in $HdPack." }

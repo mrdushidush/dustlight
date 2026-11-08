@@ -1,1 +1,36 @@
+#include <winver.h>
+#include "../../src/hd/release_info.h"
+
 IDI_ICON1 ICON DISCARDABLE "fallout2-ce.ico"
+
+// The exe's details (Properties > Details, Task Manager). Name and version come from
+// release_info.h. Without them some antivirus scanners rate the exe as more suspicious.
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION HD_RELEASE_VERSION_NUMBERS
+ PRODUCTVERSION HD_RELEASE_VERSION_NUMBERS
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+ FILEFLAGS VS_FF_PRERELEASE
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName", "mrdushidush"
+            VALUE "FileDescription", HD_RELEASE_NAME ", HD engine for Fallout 2"
+            VALUE "FileVersion", HD_RELEASE_VERSION
+            VALUE "InternalName", "dustlight"
+            VALUE "LegalCopyright", "Fallout 2 Community Edition authors and mrdushidush. Sustainable Use License 1.0."
+            VALUE "OriginalFilename", "dustlight.exe"
+            VALUE "ProductName", HD_RELEASE_NAME
+            VALUE "ProductVersion", HD_RELEASE_VERSION
+            VALUE "Comments", "Free, non-commercial mod. Source: https://github.com/mrdushidush/dustlight"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
