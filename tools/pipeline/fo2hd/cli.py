@@ -218,7 +218,7 @@ def cmd_release(args) -> int:
         hdpack=Path(args.hdpack) if args.hdpack else paths.data_root / "hdpack",
         pristine=paths.pristine,
         out=Path(args.out),
-        tiers=[int(t) for t in args.tiers.split(",")],
+        tiers=[] if args.tiers.strip().lower() == "none" else [int(t) for t in args.tiers.split(",")],
         max_part_bytes=int(float(args.max_part_gb) * 1e9),
         credits=release.load_credits(Path(args.art_credits)),
         fields=fields,
@@ -690,7 +690,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--doc", action="append", help="source=name in the zip, e.g. docs/player/README.md=Relit-README.md")
     p.add_argument("--hdpack", help="runtime packs (default: <data_root>/hdpack)")
     p.add_argument("--out", required=True)
-    p.add_argument("--tiers", default="2,3,4")
+    p.add_argument("--tiers", default="2,3,4", help="art packs to zip, or none: an engine-only update (the art of an earlier release)")
     p.add_argument("--max-part-gb", default="4.0", help="largest zip (Nexus took 5 GB per file at last report)")
     p.add_argument("--art-credits", required=True, help="docs/player/art_credits_*.json: the models that made the art; the release refuses art from any other")
     p.add_argument("--field", action="append", help="key=value (or key=@file) for {key} in the docs, e.g. known_issues=@docs/player/known_issues.md")

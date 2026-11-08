@@ -379,6 +379,8 @@ float aboveAt(float2 uv)
     // gFieldMax instead of growing without bound.
     if (gFieldMax > 1.0 && total > 1.0) {
         total = 1.0 + (gFieldMax - 1.0) * (1.0 - exp(-(total - 1.0) / (gFieldMax - 1.0)));
+    } else if (gFieldMax > 0.0) {
+        total = min(total, gFieldMax); // 1 or less: a hard limit (was: none at all)
     }
     return (total - gAmbient) * gLightScale;
 }

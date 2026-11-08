@@ -6,6 +6,6 @@
 // them from here for the zip names and the player docs. The name is
 // provisional (the author, 2026-11-04: "Dustlight for now").
 #define HD_RELEASE_NAME "Dustlight"
-#define HD_RELEASE_VERSION "0.9.0-beta"
+#define HD_RELEASE_VERSION "0.9.1-beta"
 
 #endif /* FALLOUT_HD_RELEASE_INFO_H_ */

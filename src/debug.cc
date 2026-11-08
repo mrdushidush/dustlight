@@ -51,6 +51,13 @@ void debugModeInit(const char* debugMode)
     // CE: Handle debug mode (exactly as seen in `mapper2.exe`).
     if (compat_stricmp(debugMode, "environment") == 0) {
         _debug_register_env();
+        // HD: players can send debug.log without setting DEBUGACTIVE first:
+        // with the variable unset (fallout2.cfg says mode=environment by
+        // default), write debug.log. It starts fresh at each launch and a
+        // long play session stays under 1 MB. mode=none turns logging off.
+        if (gDebugPrintProc == nullptr && getenv("DEBUGACTIVE") == nullptr) {
+            _debug_register_log("debug.log", "wt");
+        }
     } else if (compat_stricmp(debugMode, "screen") == 0) {
         _debug_register_screen();
     } else if (compat_stricmp(debugMode, "log") == 0) {

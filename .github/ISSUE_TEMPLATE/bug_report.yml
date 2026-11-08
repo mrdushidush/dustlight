@@ -1,0 +1,128 @@
+name: Bug report
+description: Something looks wrong, crashes or doesn't start in Dustlight.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please report Dustlight problems here, not to Fallout 2 CE.
+        Dustlight has only been tested on one PC so far, so your graphics card and screen help a lot.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead. Where in the game (town, map, screen)?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      description: Steps, if you know them. A save from just before it happens helps a lot (zip the save's SLOT folder from data\savegame and drag it here).
+    validations:
+      required: false
+
+  - type: dropdown
+    id: original_art
+    attributes:
+      label: Does it go away with the original art (Ctrl+F8) or the original light (Ctrl+F7)?
+      options:
+        - Didn't try
+        - Goes away with Ctrl+F8 (original art)
+        - Goes away with Ctrl+F7 (original light)
+        - Still there with both
+        - Can't try (crash or doesn't start)
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: debug.log
+      description: The game writes `debug.log` in its folder, next to dustlight.exe, fresh at each start. Drag it here right after the problem, before starting the game again.
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Drag a screenshot here, if it's something you can see.
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: Dustlight version
+      description: From the zip's name, for example 0.9.0-beta.
+      placeholder: 0.9.0-beta
+    validations:
+      required: true
+
+  - type: dropdown
+    id: pack
+    attributes:
+      label: Art pack
+      options:
+        - 2x
+        - 3x
+        - 4x
+        - No art pack
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: Graphics card
+      placeholder: e.g. NVIDIA RTX 3060, AMD RX 6700, Intel UHD 620
+    validations:
+      required: true
+
+  - type: input
+    id: screen
+    attributes:
+      label: Screen resolution
+      placeholder: e.g. 1920x1080, 2560x1440, 3840x2160
+    validations:
+      required: true
+
+  - type: dropdown
+    id: store
+    attributes:
+      label: Your copy of Fallout 2
+      options:
+        - Epic
+        - GOG
+        - Steam
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: Game language
+      placeholder: English
+    validations:
+      required: false
+
+  - type: input
+    id: mods
+    attributes:
+      label: Other mods
+      description: For example the Restoration Project, the High Resolution Patch, sfall, Sonora. Write "none" if none.
+      placeholder: none
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: e.g. Windows 11
+    validations:
+      required: false

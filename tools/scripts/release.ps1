@@ -5,6 +5,7 @@
 #                                            (name, version: src/hd/release_info.h)
 #   release.ps1 ... -Tiers 2 -SkipBuild      one tier, the exe as last built
 #   release.ps1 ... -DocsOnly                only the filled docs, in <release data root>\reports\player-docs
+#   release.ps1 ... -Tiers none -Field 'size_2x=about 1.5 GB',...   engine-only update (art of an earlier release)
 #
 # Output: <release data root>\dist\<Version>\ (zips, nexus.md, SHA256SUMS.txt, release.json) and
 # the exe's pdb in <release data root>\symbols\<Version>\ for crash reports (never shipped).
@@ -19,7 +20,10 @@ param(
     [string]$Tiers = '2,3,4',
     [string]$SourceUrl = '(to be published)',
     [switch]$SkipBuild,
-    [switch]$DocsOnly
+    [switch]$DocsOnly,
+    # More {key} values for the docs, e.g. an engine-only update (-Tiers none) states the
+    # earlier release's pack sizes: -Field 'size_2x=about 1.5 GB','size_3x=about 3.2 GB'
+    [string[]]$Field = @()
 )
 
 . (Join-Path $PSScriptRoot 'common.ps1')
@@ -59,6 +63,7 @@ foreach ($lic in Get-ChildItem (Join-Path $r 'third_party') -Recurse -Depth 1 -F
 }
 $docArgs = @(); foreach ($d in $docs) { $docArgs += @('--doc', $d) }
 $fields = @('--field', "known_issues=@$r\docs\player\known_issues.md", '--field', "source_url=$SourceUrl")
+foreach ($f in $Field) { $fields += @('--field', $f) }
 $extra = @('--art-credits', $Credits, '--page', "$r\docs\player\nexus.md")
 if ($DocsOnly) { $extra += '--docs-only' }
 

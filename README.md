@@ -5,9 +5,14 @@ It is a **modified version** of Fallout 2 Community Edition (see [NOTICE.md](NOT
 runs on Windows with Direct3D 11. This repository holds no game data and no HD art; to play,
 you need your own copy of Fallout 2.
 
-- **Download:** the [engine](https://github.com/mrdushidush/dustlight/releases/tag/v0.9.0-beta) from this repository's release page, and one art pack from [Nexus Mods](https://www.nexusmods.com/fallout2/mods/193).
+- **Download:** the [engine](https://github.com/mrdushidush/dustlight/releases) from this repository's releases (the newest at the top), and one art pack from [Nexus Mods](https://www.nexusmods.com/fallout2/mods/193).
 - **Install and settings:** in the README inside the download; its template, with the
   blanks filled at release time, is [docs/player/README.md](docs/player/README.md)
+- **Bugs:** please [report them here](https://github.com/mrdushidush/dustlight/issues/new?template=bug_report.yml),
+  not to Fallout 2 CE.
+- **Tested with:** Fallout 2 and the Restoration Project. Total conversions such as Fallout:
+  Sonora and Et Tu haven't been tested with Dustlight yet; the support list in CE's README
+  below is about CE.
 - **What's new here:** `src/hd/` (the renderer, HD art store, lighting and HD interface),
   `tools/pipeline/` (the Python pipeline that makes the art), `docs/decisions/` (why it's
   built this way). Changes to CE's own files are kept to thin hooks.

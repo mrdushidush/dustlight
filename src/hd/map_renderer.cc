@@ -69,6 +69,7 @@ namespace {
     constexpr int kHdArt = 1;
     constexpr int kHdHardAlpha = 2;
     constexpr int kHdEdgeFill = 4;
+    constexpr int kHdEdgeClamp = 8;
 
     // Tiling art's flags. [hd] edge_fill=0 keeps the plain 1x mask, saw teeth and all.
     int hardAlphaFlags()
@@ -79,6 +80,22 @@ namespace {
             return kHdHardAlpha | (on != 0 ? kHdEdgeFill : 0);
         }();
         return flags;
+    }
+
+    // [hd] edge_clamp: HD colors in a tiling piece's edge cells (and the stair fill past
+    // them) are kept within the original colors of the cell's 3x3 neighborhood. The packs
+    // were upscaled with smeared colors around each piece, which leave light or dark
+    // specks just inside the 1x mask; where pieces join they line up as a dashed line.
+    // 0 off, 1 floors (default: 0.9.1, the dashed lines along floor seams), 2 floors and
+    // roofs, 3 walls too.
+    bool edgeClampFor(MapLightCategory category)
+    {
+        static const int mode = [] {
+            int value = 1;
+            configGetInt(&gGameConfig, "hd", "edge_clamp", &value, 1);
+            return value;
+        }();
+        return (mode >= 1 && category == kLightFloor) || (mode >= 2 && category == kLightRoof) || (mode >= 3 && category == kLightWall);
     }
 
     constexpr int kAtlasSize = 4096;
@@ -127,6 +144,7 @@ struct Sprite {
 #define HD_ART 1
 #define HD_HARD_ALPHA 2
 #define HD_EDGE_FILL 4
+#define HD_EDGE_CLAMP 8
 #define HARD_EDGE_SEARCH 8
 
 StructuredBuffer<Sprite> gSprites : register(t0);
@@ -508,6 +526,34 @@ float hardEdgeFill(Sprite s, int2 e, float2 f, out int2 toward)
     return best;
 }
 
+)hlsl"
+                                     R"hlsl(
+// [hd] edge_clamp: an HD color in cell t (opaque, with a transparent 4-neighbor) or in the
+// stair fill toward t, kept within the phase-0 palette colors of the opaque cells around t.
+float3 edgeClamp(Sprite s, int2 t, float3 c)
+{
+    if (!maskOpaque(s, t)) {
+        return c;
+    }
+    if (maskOpaque(s, t + int2(1, 0)) && maskOpaque(s, t - int2(1, 0)) && maskOpaque(s, t + int2(0, 1)) && maskOpaque(s, t - int2(0, 1))) {
+        return c;
+    }
+    float3 lo = float3(1e9, 1e9, 1e9);
+    float3 hi = float3(-1e9, -1e9, -1e9);
+    [unroll] for (int k = 0; k < 9; k++) {
+        int2 e = t + int2(k % 3 - 1, k / 3 - 1);
+        if (maskOpaque(s, e)) {
+            // HD art holds the cycle colors at phase 0 (gBasePalette[256 + i], filled
+            // for 229-254 only); every other color is the live entry.
+            uint i = gAtlas.Load(int3(s.src + e, 0)) & 0xFF;
+            float3 p = gBasePalette[i >= 229 && i <= 254 ? 256 + i : i].rgb;
+            lo = min(lo, p);
+            hi = max(hi, p);
+        }
+    }
+    return clamp(c, lo, hi);
+}
+
 // Tiling HD art's coverage at target pixel `pix`, in cell t of the frame.
 float hardAlpha(Sprite s, int2 pix, int2 t, uint index, out int2 toward)
 {
@@ -639,8 +685,11 @@ HdOut psHd(VSOut i)
     float a;
     if ((s.hd.w & HD_ART) != 0) {
         art = gPool.Load(int4(s.hd.xy + pix - s.origin * gScale, s.hd.z, 0));
-        int2 toward;
+        int2 toward = int2(0, 0);
         a = (s.hd.w & HD_HARD_ALPHA) != 0 ? hardAlpha(s, pix, t, index, toward) : art.a;
+        if ((s.hd.w & HD_EDGE_CLAMP) != 0 && a > 0.0) {
+            art.rgb = edgeClamp(s, t + toward, art.rgb);
+        }
     } else {
         art = float4(baseColor(index), 1.0);
         a = index != 0 ? 1.0 : 0.0;
@@ -833,6 +882,9 @@ GbufOut psGbuffer(VSOut i)
     if (hd) {
         art = gPool.Load(int4(s.hd.xy + pix - s.origin * gScale, s.hd.z, 0));
         a = (s.hd.w & HD_HARD_ALPHA) != 0 ? hardAlpha(s, pix, t, index, toward) : art.a;
+        if ((s.hd.w & HD_EDGE_CLAMP) != 0 && a > 0.0) {
+            art.rgb = edgeClamp(s, t + toward, art.rgb);
+        }
     } else {
         art = float4(baseColor(index), 1.0);
         a = index != 0 ? 1.0 : 0.0;
@@ -1587,6 +1639,9 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
             int y = s.rect[1] - s.origin[1];
             if (hdArtFrameTiles(record.fid, nullptr, rotation, frame, art->hash, art->width, art->height, x, y, s.rect[2] - s.rect[0] + 1, s.rect[3] - s.rect[1] + 1, tiles)) {
                 s.hd[3] = kHdArt | (tiles->front().frame.hardAlpha ? hardAlphaFlags() : 0);
+                if (tiles->front().frame.hardAlpha && edgeClampFor(static_cast<MapLightCategory>(s.light[0]))) {
+                    s.hd[3] |= kHdEdgeClamp;
+                }
             }
             return;
         }
@@ -1596,6 +1651,9 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
             s.hd[1] = hd.y;
             s.hd[2] = hd.slice;
             s.hd[3] = kHdArt | (hd.hardAlpha ? hardAlphaFlags() : 0);
+            if (hd.hardAlpha && edgeClampFor(static_cast<MapLightCategory>(s.light[0]))) {
+                s.hd[3] |= kHdEdgeClamp;
+            }
         }
     }
 

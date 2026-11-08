@@ -53,6 +53,10 @@ On its first start, {name} switches to borderless fullscreen at your desktop res
 with the scale that matches your art pack. Saves work exactly as in Fallout 2 CE: your
 existing saves load, and {name} changes nothing about what is saved.
 
+**Updating** from an earlier {name}: extract the new engine zip into the same folder and let
+it replace the files there. Your art pack, settings and saves stay; a new art pack is only
+needed when the changelog says so.
+
 Already use Fallout 2 CE? {name} is CE with the HD renderer added, so it replaces
 `fallout2-ce.exe` in its role; your CE settings in `fallout2.cfg` are kept, except the
 screen settings on the first start.

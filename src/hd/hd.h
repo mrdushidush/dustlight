@@ -23,6 +23,9 @@ namespace fallout::hd {
 //   vram_budget_mb=512        GPU memory for HD art
 //   ui_hd=1                   HD art in CE's own screens (default 1, hd/ui_layer.h)
 //   edge_fill=0               tiling HD art (floors, roofs, walls) keeps the 1x mask's saw-tooth edge
+//   edge_clamp=1              tiling HD art's edge cells kept within the original colors
+//                             around them: 1 floors (default), 2 floors and roofs, 3 walls
+//                             too, 0 off (0.9.0's look, dashed lines on some floor seams)
 //   ui_hard_alpha=1           HD UI art edges thresholded instead of blended
 //   auto_screen=1             first start: borderless at the desktop resolution,
 //                             scale from the installed art (default 1, set to 0
