@@ -9,7 +9,9 @@
 set -u
 
 banned='\.(dat|frm|fr[0-5]|pal|msg|map|acm|int|lip|aaf|fon|mve|gam|pro|lst|sve|sav|rix|png|jpe?g|gif|bmp|tga|webp|dds|ktx2?|exr|psd|wav|ogg|mp3|flac|mp4|webm|avi|onnx|pth|pt|safetensors|ckpt|gguf|sqlite|db)$'
-exempt='^(docs/images|files|os|sfall_testing)/'
+# docs/media/*.jpg: the README's own before/after screenshots (the author's exception,
+# 2026-11-08), JPEG only, nothing else in that folder.
+exempt='^(docs/images|files|os|sfall_testing)/|^docs/media/[^/]+\.jpg$'
 max_bytes=$((5 * 1024 * 1024))
 
 merging=0

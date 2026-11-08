@@ -447,6 +447,8 @@ opencode.json
 *.png
 *.jpeg
 *.jpg
+# ...except the README's own before/after screenshots (exempt in check-staged.sh too)
+!docs/media/*.jpg
 *.gif
 *.bmp
 *.tga
