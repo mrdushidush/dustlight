@@ -2,8 +2,16 @@
 
 ## {version}
 
-An engine-only update: replace the engine files; your art pack from 0.9.0-beta stays as it is.
+New world art and a new engine: install both. (The 0.9.0-beta art packs also work with this
+engine, without the floor and roof fixes below.)
 
+- Floors and roofs: no more straight lines along some tile joins (roads in Broken Hills and
+  New Reno, for example), and ribbed and corrugated metal roofs show their single tiles much
+  less. Built ground (roads, pavement, bricks) is cleaner; sand and dirt keep their grain.
+- The sun moves through the day: in the morning and evening shadows are longer and turn;
+  at noon they fall as before. `[hd_light] sun_path=0` keeps the noon sun all day.
+- Trees, cacti, bushes, rocks and barrels look a little rounder in the sun.
+  `[hd_light] round_body=0` turns it off.
 - The game writes `debug.log` in its folder at every start, so a bug report can include it
   without any setup. `[debug] mode=none` in `fallout2.cfg` turns it off.
 - No more faint dashed lines along some floor tiles' edges (seen on the Den's roads, for

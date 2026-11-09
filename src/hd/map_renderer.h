@@ -92,6 +92,9 @@ enum MapLightCategory {
     kLightCritter,
     kLightItem,
     kLightMisc,
+    // Trees, cacti, bushes, rocks, barrels (by art name, [hd_light]
+    // round_body > 0): a rounded body and more of the sun's shape.
+    kLightRound,
     kLightCategoryCount,
 };
 constexpr int kLightFlat = 1; // sprite flag: a flat object, lying on the floor

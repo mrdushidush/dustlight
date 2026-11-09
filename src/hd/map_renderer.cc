@@ -768,7 +768,7 @@ HdOut psHd(VSOut i)
 Texture2D<float4> gShape : register(t8);
 
 cbuffer Gbuffer : register(b1) {
-    float4 gCategory[8]; // per category: detail strength, relief weight, shape weight, sun shadow ignored
+    float4 gCategory[9]; // per category: detail strength, relief weight, shape weight, sun shadow ignored
     float gDetailScale;  // Sobel of albedo luminance -> 4x master units
     int2 gOccluderOrigin; // ground px (0, 0) in the occluder grid
     int gOccluderPad;
@@ -1046,7 +1046,7 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
         int occluderSize[2];
         int pad2[2];
     };
-    static_assert(sizeof(GbufferConstants) == 160, "GbufferConstants must match the HLSL cbuffer");
+    static_assert(sizeof(GbufferConstants) == 176, "GbufferConstants must match the HLSL cbuffer");
 
     struct Target {
         ComPtr<ID3D11Texture2D> texture;
@@ -1376,12 +1376,57 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
     // points, accuracy and the "no path" X into the hex and bouncing cursor
     // frames in place. Those frames are compared on every use and uploaded
     // again when they change.
+    // Round scenery (the author, 2026-11-09: trees, cacti, bushes, rocks and
+    // barrels should look more 3D) gets a rounded body (sprite_shape.h) of
+    // [hd_light] round_body strength and its own light category (round=).
+    // Known by art name; cliffs, fences and buildings stay as they were.
+    // Default 0.5: the author's blind vote of 2026-11-10 (0.5 won 5 of 6 against
+    // 0, 1 and 1.5; "the difference was very hard to tell").
+    float roundBodyStrength()
+    {
+        static const float strength = [] {
+            double value = 0.5;
+            configGetDouble(&gGameConfig, "hd_light", "round_body", &value);
+            return static_cast<float>(std::max(value, 0.0));
+        }();
+        return strength;
+    }
+
+    bool roundScenery(int fid)
+    {
+        if (FrmId(fid).objectType() != OBJ_TYPE_SCENERY || roundBodyStrength() <= 0.0f) {
+            return false;
+        }
+        static std::unordered_map<int, bool> known;
+        int key = fid & 0x0F000FFF;
+        auto it = known.find(key);
+        if (it != known.end()) {
+            return it->second;
+        }
+        char name[16] = {};
+        bool round = false;
+        if (artCopyFileName(FrmId(fid), name) == 0) {
+            for (char& c : name) {
+                c = static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
+            }
+            static const char* const kPrefixes[] = { "tree", "tre1", "bush", "cac", "rock", "drock", "modrock", "mbrocks", "barrel", "brl", "weed", "cvweed" };
+            for (const char* prefix : kPrefixes) {
+                if (strncmp(name, prefix, strlen(prefix)) == 0) {
+                    round = true;
+                    break;
+                }
+            }
+        }
+        known[key] = round;
+        return round;
+    }
+
     // The frame's shape (sprite_shape.h) into the shape atlas, at the
     // entry's place.
     void uploadShape(int fid, AtlasEntry& entry, const unsigned char* data)
     {
         gState->shapeScratch.resize(static_cast<size_t>(entry.width) * entry.height * 4);
-        spriteShape(data, entry.width, entry.height, FrmId(fid).objectType(), gState->shapeScratch.data());
+        spriteShape(data, entry.width, entry.height, FrmId(fid).objectType(), gState->shapeScratch.data(), roundScenery(fid) ? roundBodyStrength() : 0.0f);
         D3D11_BOX box = { static_cast<UINT>(entry.x), static_cast<UINT>(entry.y), 0, static_cast<UINT>(entry.x + entry.width), static_cast<UINT>(entry.y + entry.height), 1 };
         gState->context->UpdateSubresource(gState->shapeAtlas.Get(), 0, &box, gState->shapeScratch.data(), entry.width * 4, 0);
         entry.hasShape = true;
@@ -1567,7 +1612,7 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
         case OBJ_TYPE_WALL:
             return kLightWall;
         case OBJ_TYPE_SCENERY:
-            return kLightScenery;
+            return roundScenery(record.fid) ? kLightRound : kLightScenery;
         case OBJ_TYPE_CRITTER:
             return kLightCritter;
         case OBJ_TYPE_ITEM:

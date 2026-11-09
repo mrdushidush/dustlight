@@ -16,6 +16,10 @@ namespace fallout::hd {
 //                  away from the camera
 //   large, thin or solid scenery
 //                  flat, facing the camera: no body to inflate
+//   round scenery  (roundStrength > 0: trees, cacti, bushes, rocks, barrels;
+//                  the caller knows them by name) one rounded body over the
+//                  whole object, its gaps closed, roundStrength times a
+//                  sphere-like tilt at the rim
 //   height         walls/scenery: above the ground line (each column's lowest
 //                  pixel, constrained to the iso slope, so overhangs inherit the
 //                  ground of what holds them up); others: above the frame's
@@ -28,7 +32,7 @@ namespace fallout::hd {
 //
 // `objectType` is the art's OBJ_TYPE_*; tiles and interface art get no
 // shape (flat, height 0).
-void spriteShape(const unsigned char* pixels, int width, int height, int objectType, unsigned char* rgba);
+void spriteShape(const unsigned char* pixels, int width, int height, int objectType, unsigned char* rgba, float roundStrength = 0.0f);
 
 } // namespace fallout::hd
 

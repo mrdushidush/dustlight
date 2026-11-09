@@ -38,6 +38,16 @@ namespace {
     constexpr float kPillowMinRadius = 2.5f;
     constexpr float kPillowMaxFill = 0.95f;
 
+    // Round scenery (the author, 2026-11-09: trees, cacti, bushes, rocks and
+    // barrels should look more 3D): one rounded body over the whole object
+    // instead of a pillow along its edge. The silhouette with its gaps closed
+    // (between leaves and branches), blurred into a soft mound as tall as the
+    // body is thick; the mound's slope tilts the normals. Scale-free: at
+    // strength 1 the rim of a wide body tilts about 34 degrees, the middle
+    // faces the camera.
+    constexpr float kRoundClose = 0.08f; // gap closing radius, share of the smaller side (1..6 px)
+    constexpr float kRoundSigma = 0.6f; // blur, share of the body's radius
+
     // Gaussian blur of a 1D signal, border replicated.
     void blur1d(std::vector<float>& values, float sigma)
     {
@@ -209,6 +219,90 @@ namespace {
         return out;
     }
 
+    // Separable gaussian blur of a w x h image, border replicated.
+    void blur2d(std::vector<float>& image, int w, int h, float sigma)
+    {
+        std::vector<float> line;
+        for (int y = 0; y < h; y++) {
+            line.assign(image.begin() + static_cast<size_t>(y) * w, image.begin() + static_cast<size_t>(y + 1) * w);
+            blur1d(line, sigma);
+            std::copy(line.begin(), line.end(), image.begin() + static_cast<size_t>(y) * w);
+        }
+        line.resize(h);
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                line[y] = image[static_cast<size_t>(y) * w + x];
+            }
+            blur1d(line, sigma);
+            for (int y = 0; y < h; y++) {
+                image[static_cast<size_t>(y) * w + x] = line[y];
+            }
+        }
+    }
+
+    // Base normals (u, z) of round scenery: see kRoundClose.
+    void roundBody(const unsigned char* pixels, int width, int height, float strength, std::vector<float>& nu, std::vector<float>& nz)
+    {
+        int c = std::min(std::max(static_cast<int>(lroundf(kRoundClose * std::min(width, height))), 1), 6);
+        // Room around the frame, so its border (which insideDistance counts
+        // as empty) doesn't grow or eat the closed shape.
+        int pad = 2 * c + 3;
+        int w = width + 2 * pad;
+        int h = height + 2 * pad;
+        size_t n = static_cast<size_t>(w) * h;
+        std::vector<unsigned char> object(n, 0);
+        std::vector<unsigned char> empty(n, 1);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                bool opaque = pixels[y * width + x] != 0;
+                object[(y + pad) * w + x + pad] = opaque ? 1 : 0;
+                empty[(y + pad) * w + x + pad] = opaque ? 0 : 1;
+            }
+        }
+        // Closing: grow by c, then shrink by c.
+        std::vector<float> away = insideDistance(empty.data(), w, h);
+        std::vector<unsigned char> grown(n);
+        for (size_t i = 0; i < n; i++) {
+            grown[i] = object[i] != 0 || away[i] <= static_cast<float>(c) ? 1 : 0;
+        }
+        std::vector<float> in = insideDistance(grown.data(), w, h);
+        std::vector<unsigned char> closed(n);
+        std::vector<float> thickness;
+        for (size_t i = 0; i < n; i++) {
+            closed[i] = object[i] != 0 || in[i] > static_cast<float>(c) ? 1 : 0;
+        }
+        std::vector<float> depth = insideDistance(closed.data(), w, h);
+        for (size_t i = 0; i < n; i++) {
+            if (closed[i] != 0) {
+                thickness.push_back(depth[i]);
+            }
+        }
+        float radius = 1.5f;
+        if (!thickness.empty()) {
+            size_t k = std::min(thickness.size() - 1, static_cast<size_t>(thickness.size() * 0.9));
+            std::nth_element(thickness.begin(), thickness.begin() + k, thickness.end());
+            radius = std::max(radius, thickness[k]);
+        }
+        std::vector<float> mound(n);
+        for (size_t i = 0; i < n; i++) {
+            mound[i] = closed[i] != 0 ? radius : 0.0f;
+        }
+        blur2d(mound, w, h, std::max(1.0f, kRoundSigma * radius));
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                size_t i = static_cast<size_t>(y + pad) * w + x + pad;
+                float gx = (mound[i + 1] - mound[i - 1]) * 0.5f;
+                float gy = (mound[i + w] - mound[i - w]) * 0.5f;
+                // Facing the camera (v); screen x tilts toward u, screen up toward z.
+                float u = -gx * strength;
+                float z = gy * strength;
+                float length = sqrtf(u * u + 1.0f + z * z);
+                nu[static_cast<size_t>(y) * width + x] = u / length;
+                nz[static_cast<size_t>(y) * width + x] = z / length;
+            }
+        }
+    }
+
     void put(unsigned char* rgba, float u, float z, float heightPx)
     {
         rgba[0] = static_cast<unsigned char>(lroundf(std::min(std::max(u * 0.5f + 0.5f, 0.0f), 1.0f) * 255.0f));
@@ -220,7 +314,7 @@ namespace {
 
 } // namespace
 
-void spriteShape(const unsigned char* pixels, int width, int height, int objectType, unsigned char* rgba)
+void spriteShape(const unsigned char* pixels, int width, int height, int objectType, unsigned char* rgba, float roundStrength)
 {
     size_t count = static_cast<size_t>(width) * height;
     bool shaped = objectType == OBJ_TYPE_ITEM || objectType == OBJ_TYPE_CRITTER || objectType == OBJ_TYPE_SCENERY || objectType == OBJ_TYPE_WALL || objectType == OBJ_TYPE_MISC;
@@ -244,6 +338,8 @@ void spriteShape(const unsigned char* pixels, int width, int height, int objectT
                 nu[y * width + x] = u[x];
             }
         }
+    } else if (roundStrength > 0.0f && objectType == OBJ_TYPE_SCENERY) {
+        roundBody(pixels, width, height, roundStrength, nu, nz);
     } else {
         // Pillow billboard: the distance inside the silhouette as a bulge;
         // its gradient points outward.

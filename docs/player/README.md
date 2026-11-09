@@ -71,6 +71,8 @@ Everything is in `fallout2.cfg` in the game folder.
 | `[screen] resolution_x`, `resolution_y`, `windowed` | Window size; `windowed=2` is borderless fullscreen, `1` a window. |
 | `[hd_light] quality=high` | `medium` turns off bounced light, `low` also shadows and sunlight. Try these on a slower graphics card. |
 | `[hd_light] mode=original` | The original lighting on the HD art. |
+| `[hd_light] sun_path=0` | The sun stays where it is at noon all day, as in 0.9.0. |
+| `[hd_light] round_body=0` | Trees, cacti, bushes, rocks and barrels without their rounder look (default 0.5; up to about 1.5 for more). |
 | `[hd_post] enabled=0` | No film grain or vignette. |
 | `[hd] ui_hd=0` | The original interface art. |
 | `[hd] ui_text_style=sharp` | HD text style: `model` (default), `sharp` or `smooth`. |

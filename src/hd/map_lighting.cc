@@ -98,7 +98,8 @@ cbuffer Lighting : register(b0) {
     float gAgxExposure; // AgX: scene-linear scale before the curve
     float gBloomGlow;   // bloom source: share of the glow heuristic's pixels
     float gBloomHot;    // ... and of light above full white
-    float2 gPad4;
+    int gSunSteps;      // sun shadow march: steps of 3 ground px (more when the sun is low)
+    float gPad4;
 };
 
 struct Hex {
@@ -255,8 +256,9 @@ void csSunAo(uint3 id : SV_DispatchThreadID)
     if ((gFeatures & F_SUN) != 0) {
         // Steps of 3 ground px (the grid is 2 px): coarser steps print the
         // occluder's footprint once per step, as stairs along the edges.
-        [loop] for (int k = 1; k <= 64; k++) {
-            float s = 3.0 * k; // ground px, up to 192
+        // 64 at noon (192 ground px); a low sun casts longer shadows.
+        [loop] for (int k = 1; k <= gSunSteps; k++) {
+            float s = 3.0 * k; // ground px
             float blocker = occluderAt(p + gSunStep * s);
             sun = max(sun, blocker - s * gSunRise - 2.0);
         }
@@ -720,7 +722,8 @@ void csLight(uint3 id : SV_DispatchThreadID)
         float agxExposure;
         float bloomGlow;
         float bloomHot;
-        float pad4[2];
+        int sunSteps;
+        float pad4;
     };
     static_assert(sizeof(LightingConstants) == 192, "LightingConstants must match the HLSL cbuffer");
 
@@ -775,6 +778,16 @@ void csLight(uint3 id : SV_DispatchThreadID)
         float sunGain = 1.3f;
         float dayLights = 0.15f;
         float sunDir[3] = { -1.0f, -0.6f, 1.5f };
+        // The sun's path through the day (the author, 2026-11-09): sunDir is noon;
+        // from 5:00 to 19:00 the sun turns sunSwing degrees around (morning
+        // counterclockwise of noon, evening clockwise: east, south, west as
+        // the maps' north is up-right) and sinks to sunLow degrees above the
+        // horizon, so shadows turn and grow longer. Moderate by default: the
+        // art's own painted shadows fall to the lower right whatever the hour.
+        // sun_path=0: the fixed sun of 0.9.
+        int sunPath = 1;
+        float sunSwing = 40.0f;
+        float sunLow = 22.0f;
         float aoStrength = 0.4f;
         float nightAmbient = 0.92f;
         float nightTint[3] = { 0.82f, 0.88f, 1.0f };
@@ -806,6 +819,10 @@ void csLight(uint3 id : SV_DispatchThreadID)
             { 0.6f, 0.5f, 0.2f, 0.0f }, // critter
             { 0.8f, 0.5f, 0.2f, 0.0f }, // item
             { 0.8f, 0.5f, 0.2f, 0.0f }, // misc
+            // Round scenery (map_renderer.cc roundScenery): its rounded body
+            // takes the sun's shape fully; like other scenery it ignores the
+            // sun shadow map and still casts into it.
+            { 1.0f, 0.6f, 1.0f, 1.0f }, // round
         };
     };
 
@@ -951,6 +968,9 @@ void csLight(uint3 id : SV_DispatchThreadID)
         configFloat("shadow_range", &s.shadowRange);
         configFloat("sun_strength", &s.sunStrength);
         configFloats("sun_dir", s.sunDir, 3);
+        configGetInt(&gGameConfig, "hd_light", "sun_path", &s.sunPath, s.sunPath);
+        configFloat("sun_swing", &s.sunSwing);
+        configFloat("sun_low", &s.sunLow);
         configFloat("sun_gain", &s.sunGain);
         configFloat("day_lights", &s.dayLights);
         configFloat("ao_strength", &s.aoStrength);
@@ -968,7 +988,7 @@ void csLight(uint3 id : SV_DispatchThreadID)
         configFloat("gi_strength", &s.giStrength);
         configFloat("gi_ground", &s.giGround);
         configFloat("gi_wall", &s.giWall);
-        const char* names[kLightCategoryCount] = { "none", "floor", "roof", "wall", "scenery", "critter", "item", "misc" };
+        const char* names[kLightCategoryCount] = { "none", "floor", "roof", "wall", "scenery", "critter", "item", "misc", "round" };
         for (int i = 1; i < kLightCategoryCount; i++) {
             configFloats(names[i], s.category[i], 4);
         }
@@ -1124,6 +1144,31 @@ void csLight(uint3 id : SV_DispatchThreadID)
             day = (20.0f - hour) / 2.0f;
         }
         return day * std::min(std::max((ambient - 0.75f) / 0.2f, 0.0f), 1.0f);
+    }
+
+    // Toward the sun (unit, world u v z) at this time of day: Settings::sunDir
+    // at noon, turned and lowered toward 5:00 and 19:00 when sunPath is on.
+    void sunDirection(const Settings& s, int timeOfDay, float out[3])
+    {
+        float length = sqrtf(s.sunDir[0] * s.sunDir[0] + s.sunDir[1] * s.sunDir[1] + s.sunDir[2] * s.sunDir[2]);
+        for (int k = 0; k < 3; k++) {
+            out[k] = length > 0.0f ? s.sunDir[k] / length : (k == 2 ? 1.0f : 0.0f);
+        }
+        if (s.sunPath == 0) {
+            return;
+        }
+        const float degree = 0.017453293f;
+        float hour = (timeOfDay / 100) + (timeOfDay % 100) / 60.0f;
+        float t = std::min(std::max((hour - 12.0f) / 7.0f, -1.0f), 1.0f);
+        float ground = sqrtf(out[0] * out[0] + out[1] * out[1]);
+        float noonHeight = atan2f(out[2], ground);
+        float low = std::min(s.sunLow * degree, noonHeight);
+        float height = low + (noonHeight - low) * cosf(t * 1.5707963f);
+        // u right, v down the screen: a growing angle turns clockwise on screen.
+        float turn = (ground > 1e-4f ? atan2f(out[1], out[0]) : 0.0f) + s.sunSwing * degree * t;
+        out[0] = cosf(height) * cosf(turn);
+        out[1] = cosf(height) * sinf(turn);
+        out[2] = sinf(height);
     }
 
     void timerStamp(TimerFrame* frame, int index)
@@ -1408,8 +1453,8 @@ bool mapLightingDraw(int mapWidth, int mapHeight, int scale, const float* palett
     constants.shadowStrength = s.shadowStrength;
     constants.sunStrength = s.sunStrength * day;
     constants.aoStrength = s.aoStrength;
-    float sunLength = sqrtf(s.sunDir[0] * s.sunDir[0] + s.sunDir[1] * s.sunDir[1] + s.sunDir[2] * s.sunDir[2]);
-    float sun[3] = { s.sunDir[0] / sunLength, s.sunDir[1] / sunLength, s.sunDir[2] / sunLength };
+    float sun[3];
+    sunDirection(s, scene.timeOfDay, sun);
     float sunGround = std::max(sqrtf(sun[0] * sun[0] + sun[1] * sun[1]), 1e-3f);
     constants.sun[0] = sun[0];
     constants.sun[1] = sun[1];
@@ -1417,6 +1462,9 @@ bool mapLightingDraw(int mapWidth, int mapHeight, int scale, const float* palett
     constants.sunStep[0] = sun[0] / sunGround;
     constants.sunStep[1] = sun[1] / sunGround * 0.5f;
     constants.sunRise = sun[2] / sunGround * 0.8660254f;
+    // Long enough for a 200 px tall blocker's whole shadow: 64 steps (192
+    // ground px) at noon as in 0.9, at most 160 (480 px) when the sun is low.
+    constants.sunSteps = std::min(std::max(static_cast<int>(ceilf(200.0f / (3.0f * std::max(constants.sunRise, 1e-3f)))), 64), 160);
     constants.features = enabled;
     constants.mix = s.originalMix;
     constants.fieldSigma = s.fieldSigma;
