@@ -413,15 +413,27 @@ def build(
             results.append({"file": Path(path).name, "bytes": size, "sha256": digest})
             report(f"  {Path(path).name}: {size / 1e9:.2f} GB")
     over = [r["file"] for r in results if r["bytes"] > max_part_bytes]
+    # The docs' pack sizes are filled in before the zips exist (the engine zip carries them). The
+    # estimate from raw bytes was far off in 0.9.2 (2.4 / 5.3 / 9.5 GB for zips of 1.5 / 3.2 / 3.3 GB):
+    # say so loudly; pass the real sizes with -Field size_Nx=... and build again.
+    size_mismatch = []
+    for tier in tiers:
+        real = sum(r["bytes"] for r in results if f"-art-{tier}x" in r["file"]) / 1e9
+        said = re.search(r"([0-9.]+) GB", values.get(f"size_{tier}x", ""))
+        if said and abs(float(said.group(1)) - real) > max(0.1, 0.05 * real):
+            size_mismatch.append(f"{tier}x: docs say {values[f'size_{tier}x']}, zips are {real:.2f} GB")
     sums = "".join(f"{r['sha256']}  {r['file']}\n" for r in results)
     (out / "SHA256SUMS.txt").write_text(sums, encoding="utf-8", newline="\n")
     if page_data is not None:
         (out / page.name).write_bytes(page_data)
     info = {
         "name": name, "version": version, "model": model, "tiers": tiers, "max_part_bytes": max_part_bytes,
-        "files": results, "over_limit": over, "exe_imports": pe_imports(exe), "seconds": round(time.perf_counter() - started),
+        "files": results, "over_limit": over, "size_mismatch": size_mismatch, "exe_imports": pe_imports(exe),
+        "seconds": round(time.perf_counter() - started),
     }
     (out / "release.json").write_text(json.dumps(info, indent=1), encoding="utf-8", newline="\n")
     if over:
         report(f"WARNING: over the part limit: {over}")
+    for line in size_mismatch:
+        report(f"WARNING: pack size in the docs is wrong, {line} (release.ps1 -Field size_{line[0]}x='about N GB')")
     return info
