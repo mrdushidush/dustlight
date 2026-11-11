@@ -1509,6 +1509,7 @@ bool mapLightingDraw(int mapWidth, int mapHeight, int scale, const float* palett
     memcpy(draw.category, s.category, sizeof(draw.category));
     // Sobel on the tier's pixels -> the 4x masters' units (hdassets).
     draw.detailScale = scale / 4.0f;
+    draw.sun = (enabled & kSun) != 0;
     if (!mapRendererDrawGbuffer(scale, palette, draw)) {
         timerEnd(timer);
         return false;

@@ -63,6 +63,15 @@ $docs = @(
     "$r\docs\player\THIRD_PARTY.md=hd/docs/THIRD_PARTY.md",
     "$r\docs\player\CHANGELOG.md=hd/docs/CHANGELOG.md"
 )
+if (-not $DocsOnly) {
+    # The engine's masks of the shadows painted into the original art (tools/scripts/painted_shadows.py), made
+    # afresh from the working copy's original art at every release.
+    $shadows = Join-Path $r 'out\dist\painted_shadows.json'
+    Invoke-Native { & (Join-Path $r 'tools\pipeline\.venv\Scripts\python.exe') (Join-Path $r 'tools\scripts\painted_shadows.py') `
+        --game (Get-HdPaths)['working_copy'] --out $shadows } | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) { throw "painted_shadows.py failed ($LASTEXITCODE)" }
+    $docs += "$shadows=hd/painted_shadows.json"
+}
 foreach ($lic in Get-ChildItem (Join-Path $r 'third_party') -Recurse -Depth 1 -File | Where-Object { $_.Name -match '^LICENSE' }) {
     $docs += "$($lic.FullName)=hd/docs/licenses/$($lic.Directory.Name).txt"
 }

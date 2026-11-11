@@ -1,0 +1,227 @@
+# Painted shadows in the original world art (tools/scripts/painted_shadows.py): per sprite, one pixel
+# (x,y in frame 0, direction 0) inside each candidate patch that is a cast shadow on the ground.
+# From a review of every candidate sprite by eye (Claude, 2026-11-10): 536 sprites with patches of 100 px
+# or more, plus trees and cacti at 15 px, then every further patch (12 px and up) of the sprites kept, as
+# objects split their shadow in pieces. Left out: thin contact shadows right under objects, dark object
+# parts, doorways, cave mouths, black walls, chain-link fences, leaves, map exit grids; also the San Francisco
+# dock pieces (dockfm*): the shade under a covered walkway, which casts none of ours (round 8, 2026-11-10);
+# barrel stacks (barrel3-5): mostly the barrels' own dark side.
+
+scenery/abomb1 58,74
+scenery/altar3 21,33 56,43 53,45 39,48
+scenery/bar01 67,66
+scenery/barsign 17,37
+scenery/bath03 19,26
+scenery/bath05 7,45
+scenery/bath07 25,25
+scenery/bath08 11,44
+scenery/bigcomp1 47,116
+scenery/bladsign 100,74
+scenery/boxes2 18,55
+scenery/boxes4 40,55 26,54
+scenery/brotbl01 21,33
+scenery/bspew 53,44
+scenery/bvs26 57,51 23,39 88,52
+scenery/bvs28 48,52 23,40 90,52
+scenery/cac1000 31,68
+scenery/camera01 19,43 32,46
+scenery/car1 87,92 194,71 167,79 155,82
+scenery/car2 67,87 147,72 195,52 33,94 55,95
+scenery/car3 47,73 161,92
+scenery/car4 99,78 35,81 197,58
+scenery/car5 88,87 133,71 68,79 111,78
+scenery/carspec1 68,86 138,102 193,68
+scenery/carspec2 138,116 218,73 36,141
+scenery/cart1 39,44
+scenery/casent01 120,66
+scenery/casino1 7,70
+scenery/casino2 17,68
+scenery/casino5 44,23
+scenery/casino6 20,32
+scenery/ccart01 37,78 123,72 6,42
+scenery/ccart02 31,83 99,74
+scenery/ccart03 54,87 10,69
+scenery/ccart05 115,106 96,84 7,83
+scenery/constrc1 46,80
+scenery/constrc2 46,75
+scenery/crptbl05 37,55
+scenery/crptbl06 15,40
+scenery/crptbl10 23,43
+scenery/ctown09 98,70
+scenery/ctown10 280,65
+scenery/ctown11 151,55
+scenery/ctown15 92,56
+scenery/ctown16 221,39
+scenery/deadbot 19,28 7,44
+scenery/expnch 24,77
+scenery/exwtlft1 49,59 72,32 5,47
+scenery/exwtlft2 16,57 76,56
+scenery/flamp1 24,64
+scenery/flamp2 19,61
+scenery/flamp4 18,61
+scenery/flamp5 19,59
+scenery/flcsign1 45,42
+scenery/flcsign2 36,52
+scenery/gaspump2 39,60
+scenery/gassign2 90,27
+scenery/horse1 32,36
+scenery/horse2 29,32
+scenery/howitzer 84,71
+scenery/howitzr2 133,32
+scenery/iguana4 27,35 124,48 128,14
+scenery/ltable1 92,43 19,50 126,37
+scenery/ltable2 80,44 17,50 127,36
+scenery/ltable3 32,40
+scenery/ltable4 34,63 9,58 58,64
+scenery/ltable5 23,40
+scenery/ltable6 23,61 0,55 54,63
+scenery/maryj02 24,24 5,22
+scenery/medtbl01 56,77
+scenery/medtbl02 31,69 5,56
+scenery/medtbl03 55,77
+scenery/medtbl04 31,69 5,56
+scenery/medtbl05 31,45 5,32
+scenery/medtbl08 57,61 80,63
+scenery/medtbl10 31,45 5,32
+scenery/modwell1 35,69
+scenery/mushrm2 50,30 9,31
+scenery/ncrbill 92,115
+scenery/necpew2 46,44
+scenery/pipes1 60,89 132,98
+scenery/pipes2 42,57 105,67
+scenery/posts 30,46
+scenery/prestabl 116,95
+scenery/radar03 106,40
+scenery/radsign1 19,47
+scenery/rawhide 50,71 18,76
+scenery/redsgn01 47,54
+scenery/redsgn02 30,45
+scenery/redsgn05 69,76 99,63 9,88
+scenery/redsgn06 31,82
+scenery/redsgn07 10,71 30,78
+scenery/redsgn08 50,107
+scenery/renosgn7 20,94
+scenery/renosgn8 241,63
+scenery/renosgn9 84,86
+scenery/roltbl01 3,31
+scenery/roltbl05 33,58
+scenery/sfroad09 195,94 49,129 120,113
+scenery/sfroad10 177,79 29,140 122,106 66,125 100,114 51,133
+scenery/shplank 19,58
+scenery/shuttl35 174,24
+scenery/shuttl36 170,82
+scenery/shuttl37 56,52 125,19
+scenery/shuttl38 128,103
+scenery/shuttl39 45,80
+scenery/shuttl40 155,101
+scenery/sign03 21,44 6,32
+scenery/sign06 29,56
+scenery/sign11 31,86 93,72 19,96
+scenery/sign12 93,46 10,60
+scenery/sink1 23,20
+scenery/sink2 22,19
+scenery/slmach1 26,53 8,55
+scenery/slmach2 28,49 10,53
+scenery/ss101 78,43 3,42 93,41
+scenery/ss102 45,43 11,42 90,42
+scenery/ss103 48,40 15,39 80,36
+scenery/ss104 13,37 10,34
+scenery/ss109 15,41 3,40
+scenery/ss113 16,37 26,33
+scenery/ss114 13,40 7,39 27,36
+scenery/ss116 15,33 29,27 7,31
+scenery/ss117 13,31 24,29 5,33
+scenery/ss119 13,34 5,35 28,30
+scenery/sstove1 48,74
+scenery/sstove2 53,78
+scenery/sstove4 25,85
+scenery/staff 32,111 17,110
+scenery/stake01 46,58 14,62
+scenery/stake02 47,54 14,54
+scenery/stake03 42,67 24,68
+scenery/stake04 29,65 12,63
+scenery/stake05 38,56 19,62
+scenery/stake06 54,63 24,58
+scenery/stake08 12,56
+scenery/stake09 17,72
+scenery/startrk 170,112
+scenery/still 33,48
+scenery/table1 3,39
+scenery/table2 2,39
+scenery/table3 27,37
+scenery/table4 48,42 13,38
+scenery/table5 49,37 76,32
+scenery/table6 41,39 25,44
+scenery/table7 25,39 85,43 56,50
+scenery/tbl1000 33,27 23,25
+scenery/tbl3000 58,52 24,42 88,53
+scenery/tbl4000 79,43 16,42 98,40
+scenery/tblmetl1 101,43
+scenery/tblmetl2 6,42
+scenery/tblmetl3 61,50
+scenery/tblmetl4 83,48
+scenery/tblrust1 98,43
+scenery/tblrust2 100,41
+scenery/tblrust3 62,50
+scenery/tblrust4 70,48
+scenery/tblsad 69,69 23,73
+scenery/temple08 16,50
+scenery/tempsf04 28,28 10,32 71,24
+scenery/tempsf05 17,29 47,40
+scenery/tre1000 36,64 47,57
+scenery/tree2 44,82
+scenery/tree7 41,113
+scenery/tree9 35,125
+scenery/truck2 34,118
+scenery/truck3 135,136 178,102 66,162 36,151 9,140 48,159 22,147
+scenery/verti06 53,25 66,46 30,49 5,42
+scenery/verti07 125,72 255,42 16,55 88,20 166,5
+scenery/verti08 133,55 34,24
+scenery/verti09 76,66 0,68
+scenery/verti16 148,75 74,105 77,68 103,32 17,62 191,16 80,6
+scenery/verti17 24,61 53,24 85,8
+scenery/verti18 143,79 61,101 182,31 201,78 24,49 113,116 105,49 102,73 72,66 25,25 99,7 112,55 110,32 168,134 107,44
+scenery/wartable 62,60
+scenery/wdbeam11 30,17
+scenery/wdbeam12 52,46
+scenery/wdbeam13 13,24
+scenery/wdbeam14 98,33
+scenery/wdbeam15 29,30
+scenery/wdbeam16 78,39
+scenery/wdbeam17 56,51
+scenery/wdbeam18 75,38
+scenery/wdbeam19 59,45
+scenery/wdbeam28 29,21
+scenery/wdbeam29 29,13
+scenery/wdbeam30 31,29
+scenery/wdbeam31 25,16
+scenery/wdbeam32 51,46
+scenery/wdbeam33 46,25
+scenery/wdbeam34 52,44
+scenery/wdbeam35 91,23
+scenery/ypole1 80,66 75,79
+items/ccart01 37,78 123,72 6,42
+items/ccart02 31,83 99,74
+items/medtbl06 46,52 18,66
+items/medtbl07 38,49 94,55
+items/pooltbl1 50,54 22,40 32,52 78,48
+items/pooltbl2 50,54 22,40 32,52 78,48
+items/pooltbl3 50,54 22,40 32,52 78,48
+items/pooltbl4 43,49 72,42 23,46 86,37
+items/pooltbl5 43,49 72,42 23,46 86,37
+items/pooltbl6 43,49 72,42 23,46 86,37
+walls/fen2000 12,49 7,33
+walls/fen4000 12,42 3,26
+walls/fen6000 13,49 15,33
+walls/fen9003 22,47 18,25
+walls/fen9011 15,49 10,33
+walls/fen9015 28,49 23,33 10,44
+walls/fen9016 8,54
+walls/fen9017 11,47
+scenery/cac2000 66,75
+scenery/tree1 19,54 43,51
+scenery/tree3 21,64 46,65
+scenery/tree4 14,116
+scenery/tree5 20,119
+scenery/tree6 22,101
+scenery/tree8 27,130

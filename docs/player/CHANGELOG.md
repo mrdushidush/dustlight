@@ -2,6 +2,16 @@
 
 ## {version}
 
+A new engine only: the 0.9.2-beta art packs stay as they are.
+
+- The black shadows painted into the original art under buildings, scenery and cars are now
+  drawn very faint. They always fell to the lower right and stayed black while the sun moved;
+  the new light's own shadows take their place. `[hd_light] painted_shadows=1` brings them
+  back (0 removes them). Characters and creatures keep theirs, and with `quality=low` (no
+  sun) they all stay as painted.
+
+## 0.9.2-beta
+
 New world art and a new engine: install both. (The 0.9.0-beta art packs also work with this
 engine, without the floor and roof fixes below.)
 

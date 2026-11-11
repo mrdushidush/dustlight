@@ -3,11 +3,14 @@
 #ifdef _WIN32
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <algorithm>
+#include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include <wrl/client.h>
 
@@ -19,6 +22,7 @@
 #include "hd/d3d11_shared.h"
 #include "hd/draw_list.h"
 #include "hd/hd_art.h"
+#include "hd/json_reader.h"
 #include "hd/sprite_shape.h"
 #include "map.h"
 #include "obj_types.h"
@@ -771,7 +775,7 @@ cbuffer Gbuffer : register(b1) {
     float4 gCategory[9]; // per category: detail strength, relief weight, shape weight, sun shadow ignored
     float gDetailScale;  // Sobel of albedo luminance -> 4x master units
     int2 gOccluderOrigin; // ground px (0, 0) in the occluder grid
-    int gOccluderPad;
+    float gPaintedShadow; // [hd_light] painted_shadows: their strength, 1 = as painted
     int2 gOccluderSize;
     int2 gOccluderPad2;
 };
@@ -817,7 +821,25 @@ float hdLuma(Sprite s, int2 q)
     return luma(gPool.Load(int4(s.hd.xy + q, s.hd.z, 0)).rgb);
 }
 
-float shapeHeight(float4 raw) { return (round(raw.b * 255.0) + round(raw.a * 255.0) * 256.0) / 16.0; }
+float shapeHeight(float4 raw) { return (round(raw.b * 255.0) + float(uint(round(raw.a * 255.0)) & 127u) * 256.0) / 16.0; }
+// A texel of a shadow painted into the art (sprite_shape.h): flat on the ground.
+bool shapePainted(float4 raw) { return (uint(round(raw.a * 255.0)) & 128u) != 0; }
+
+// How much of the target pixel lies on a painted shadow: bilinear over the
+// 1x texels, so the patch's edge stays soft at the HD scale.
+float paintedShadowAt(Sprite s, int2 pix)
+{
+    float2 f = (float2(pix) + 0.5) / gScale - 0.5 - float2(s.origin);
+    int2 i0 = int2(floor(f));
+    float2 t = f - float2(i0);
+    float painted = 0.0;
+    [unroll] for (int k = 0; k < 4; k++) {
+        int2 e = clamp(i0 + int2(k & 1, k >> 1), int2(0, 0), s.size - 1);
+        float w = ((k & 1) != 0 ? t.x : 1.0 - t.x) * ((k >> 1) != 0 ? t.y : 1.0 - t.y);
+        painted += shapePainted(gShape.Load(int3(s.src + e, 0))) ? w : 0.0;
+    }
+    return painted;
+}
 
 // The sprite's shape (sprite_shape.h) at a target pixel: the normal
 // bilinear over the 1x texels; the height bilinear over the opaque ones
@@ -836,7 +858,7 @@ void shapeAt(Sprite s, int2 pix, out float3 n, out float height)
         float w = ((k & 1) != 0 ? t.x : 1.0 - t.x) * ((k >> 1) != 0 ? t.y : 1.0 - t.y);
         float4 raw = gShape.Load(int3(s.src + e, 0));
         uz += raw.rg * w;
-        if (gAtlas.Load(int3(s.src + e, 0)) != 0) {
+        if (gAtlas.Load(int3(s.src + e, 0)) != 0 && !shapePainted(raw)) {
             heights += shapeHeight(raw) * w;
             weights += w;
         }
@@ -889,6 +911,16 @@ GbufOut psGbuffer(VSOut i)
         art = float4(baseColor(index), 1.0);
         a = index != 0 ? 1.0 : 0.0;
     }
+    // A shadow painted into the art (sprite_shape.h) at gPaintedShadow: the
+    // whole patch evenly (checkerboard holes too), near black, so it darkens
+    // the ground a little instead of hiding it.
+    uint category = uint(s.light.x);
+    float painted = 0.0;
+    if (s.op == OP_LIT && category >= CAT_WALL && category != CAT_CRITTER && gPaintedShadow < 1.0) {
+        painted = paintedShadowAt(s, pix);
+        a = lerp(a, gPaintedShadow, painted);
+        art.rgb = lerp(art.rgb, float3(0.04, 0.04, 0.04), painted);
+    }
     if (a <= 0.0) {
         discard;
     }
@@ -924,7 +956,6 @@ GbufOut psGbuffer(VSOut i)
     }
     art.rgb = max(art.rgb + cycle.delta, 0.0);
 
-    uint category = uint(s.light.x);
     bool flat = category == CAT_FLOOR || category == CAT_ROOF || (s.light.y & LIGHT_FLAT) != 0;
     float3 n = float3(0.0, 0.0, 1.0);
     float height = 0.0;
@@ -994,7 +1025,11 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
         if (gAtlas.Load(int3(s.src + e, 0)) == 0) {
             continue;
         }
-        float height = shapeHeight(gShape.Load(int3(s.src + e, 0)));
+        float4 raw = gShape.Load(int3(s.src + e, 0));
+        if (shapePainted(raw)) {
+            continue; // a painted shadow casts none
+        }
+        float height = shapeHeight(raw);
         int2 ground = s.origin + e + int2(0, int(round(height))) + gOccluderOrigin;
         if (height > 3.0 && all(ground >= 0) && all(ground < gOccluderSize)) {
             InterlockedMax(gOccluders[ground], asuint(height));
@@ -1042,7 +1077,7 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
         float category[kLightCategoryCount][4];
         float detailScale;
         int occluderOrigin[2];
-        int pad;
+        float paintedShadow;
         int occluderSize[2];
         int pad2[2];
     };
@@ -1182,6 +1217,7 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
         ComPtr<ID3D11Texture2D> shapeAtlas;
         ComPtr<ID3D11ShaderResourceView> shapeAtlasView;
         bool shapesWanted = false;
+        bool paintedFaded = false; // painted shadows drawn faint in the last G-buffer draw
         std::vector<unsigned char> shapeScratch;
         std::vector<std::pair<int, int>> glowPoints; // screen centers of lamps' and fires' hexes (kLightGlow)
         ComPtr<ID3D11PixelShader> gbufferPs;
@@ -1421,12 +1457,126 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
         return round;
     }
 
+    // Shadows painted into the original world art (the author, 2026-11-10: "the
+    // old shadows are still a pain"; they fall to the lower right whatever
+    // the sun does). tools/scripts/painted_shadows.py writes a 1x mask per
+    // listed sprite, direction and frame to hd\painted_shadows.json; masked
+    // texels lie flat on the ground in the shape (sprite_shape.h), cast no
+    // sun shadow and are drawn [hd_light] painted_shadows strong (1 = as
+    // painted, 0 = gone). Without the file the art stays as it was. Default
+    // 0.15 by the author's blind vote (round 8b, 2026-11-11: painted 3 of 23,
+    // 0.3 / 0.15 / 0 near even at 14 / 14 / 13; he took 0.15).
+    float paintedShadowStrength()
+    {
+        static const float strength = [] {
+            double value = 0.15;
+            configGetDouble(&gGameConfig, "hd_light", "painted_shadows", &value);
+            return static_cast<float>(std::min(std::max(value, 0.0), 1.0));
+        }();
+        return strength;
+    }
+
+    struct PaintedShadowMask {
+        int rotation;
+        int frame;
+        int width;
+        int height;
+        std::vector<int> runs; // y, x, length
+    };
+
+    const std::unordered_map<std::string, std::vector<PaintedShadowMask>>& paintedShadowMasks()
+    {
+        static const auto table = [] {
+            std::unordered_map<std::string, std::vector<PaintedShadowMask>> result;
+            if (paintedShadowStrength() >= 1.0f) {
+                return result;
+            }
+            std::vector<char> text;
+            if (FILE* file = fopen("hd\\painted_shadows.json", "rb")) {
+                char buffer[65536];
+                size_t n;
+                while ((n = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+                    text.insert(text.end(), buffer, buffer + n);
+                }
+                fclose(file);
+            }
+            JsonValue root;
+            std::string error;
+            if (text.empty() || !jsonParse(text.data(), text.size(), root, &error)) {
+                debugPrint("HD: painted shadows: no hd\\painted_shadows.json%s%s; painted shadows stay as they are\n", error.empty() ? "" : ", ", error.c_str());
+                return result;
+            }
+            size_t frames = 0;
+            for (const auto& sprite : root["sprites"].members) {
+                std::vector<PaintedShadowMask>& masks = result[sprite.first];
+                for (const JsonValue& entry : sprite.second.items) {
+                    PaintedShadowMask mask = { entry["rotation"].asInt(), entry["frame"].asInt(), entry["width"].asInt(), entry["height"].asInt(), {} };
+                    for (const JsonValue& value : entry["runs"].items) {
+                        mask.runs.push_back(value.asInt());
+                    }
+                    masks.push_back(std::move(mask));
+                    frames++;
+                }
+            }
+            debugPrint("HD: painted shadows: %d sprites, %d frames, drawn %.2f strong\n", static_cast<int>(result.size()), static_cast<int>(frames), paintedShadowStrength());
+            return result;
+        }();
+        return table;
+    }
+
+    // The frame's painted shadow as one byte per texel (1 = shadow) into
+    // `mask`; false when it has none.
+    bool paintedShadow(int fid, int frame, int rotation, int width, int height, std::vector<unsigned char>& mask)
+    {
+        static const char* const kKinds[] = { "items", "critters", "scenery", "walls", "tiles", "misc" };
+        int type = FrmId(fid).objectType();
+        if (type != OBJ_TYPE_ITEM && type != OBJ_TYPE_SCENERY && type != OBJ_TYPE_WALL && type != OBJ_TYPE_MISC) {
+            return false;
+        }
+        const auto& table = paintedShadowMasks();
+        char name[16] = {};
+        if (table.empty() || artCopyFileName(FrmId(fid), name) != 0) {
+            return false;
+        }
+        std::string key = std::string(kKinds[type]) + "/";
+        for (const char* c = name; *c != '\0' && *c != '.'; c++) {
+            key += static_cast<char>(*c >= 'A' && *c <= 'Z' ? *c - 'A' + 'a' : *c);
+        }
+        auto it = table.find(key);
+        if (it == table.end()) {
+            return false;
+        }
+        // Its own direction's mask, else direction 0's (the tool writes only
+        // directions whose pixels differ).
+        const PaintedShadowMask* found = nullptr;
+        for (const PaintedShadowMask& m : it->second) {
+            if (m.frame == frame && m.width == width && m.height == height && (m.rotation == rotation || (m.rotation == 0 && found == nullptr))) {
+                found = &m;
+            }
+        }
+        if (found == nullptr) {
+            return false;
+        }
+        mask.assign(static_cast<size_t>(width) * height, 0);
+        for (size_t k = 0; k + 2 < found->runs.size(); k += 3) {
+            int y = found->runs[k];
+            int x = found->runs[k + 1];
+            int length = found->runs[k + 2];
+            if (y >= 0 && y < height && x >= 0 && x + length <= width) {
+                memset(mask.data() + static_cast<size_t>(y) * width + x, 1, length);
+            }
+        }
+        return true;
+    }
+
     // The frame's shape (sprite_shape.h) into the shape atlas, at the
     // entry's place.
-    void uploadShape(int fid, AtlasEntry& entry, const unsigned char* data)
+    void uploadShape(int fid, int frame, int rotation, AtlasEntry& entry, const unsigned char* data)
     {
         gState->shapeScratch.resize(static_cast<size_t>(entry.width) * entry.height * 4);
-        spriteShape(data, entry.width, entry.height, FrmId(fid).objectType(), gState->shapeScratch.data(), roundScenery(fid) ? roundBodyStrength() : 0.0f);
+        std::vector<unsigned char> painted;
+        bool hasPainted = paintedShadow(fid, frame, rotation, entry.width, entry.height, painted);
+        spriteShape(data, entry.width, entry.height, FrmId(fid).objectType(), gState->shapeScratch.data(), roundScenery(fid) ? roundBodyStrength() : 0.0f, hasPainted ? painted.data() : nullptr);
         D3D11_BOX box = { static_cast<UINT>(entry.x), static_cast<UINT>(entry.y), 0, static_cast<UINT>(entry.x + entry.width), static_cast<UINT>(entry.y + entry.height), 1 };
         gState->context->UpdateSubresource(gState->shapeAtlas.Get(), 0, &box, gState->shapeScratch.data(), entry.width * 4, 0);
         entry.hasShape = true;
@@ -1446,7 +1596,7 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
         }
         unsigned char* data = artGetFrameData(art, frame, static_cast<Rotation>(rotation));
         if (data != nullptr) {
-            uploadShape(fid, entry, data);
+            uploadShape(fid, frame, rotation, entry, data);
         }
         artUnlock(handle);
     }
@@ -1507,7 +1657,7 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
             }
             entry->hasShape = false;
             if (gState->shapesWanted && !mutableArt) {
-                uploadShape(fid, *entry, data);
+                uploadShape(fid, frame, rotation, *entry, data);
             }
         }
         artUnlock(handle);
@@ -2458,6 +2608,29 @@ ID3D11UnorderedAccessView* mapRendererHdUav(int scale)
     return gState->hdTargets[scale].uav.Get();
 }
 
+bool mapRendererPaintedShadowTexel(int fid, int frame, int rotation, int width, int height, int x, int y)
+{
+    // The self-test asks pixel by pixel; one frame's mask is kept.
+    static int lastFid = -1;
+    static int lastFrame = -1;
+    static int lastRotation = -1;
+    static bool lastHas = false;
+    static std::vector<unsigned char> lastMask;
+    if (gState == nullptr || !gState->shapesWanted || !gState->paintedFaded || paintedShadowStrength() >= 1.0f || x < 0 || y < 0 || x >= width || y >= height) {
+        return false;
+    }
+    if (fid != lastFid || frame != lastFrame || rotation != lastRotation || lastMask.size() != static_cast<size_t>(width) * height) {
+        lastFid = fid;
+        lastFrame = frame;
+        lastRotation = rotation;
+        lastHas = paintedShadow(fid, frame, rotation, width, height, lastMask);
+        if (!lastHas) {
+            lastMask.assign(static_cast<size_t>(width) * height, 0);
+        }
+    }
+    return lastHas && lastMask[static_cast<size_t>(y) * width + x] != 0;
+}
+
 void mapRendererWantShapes(bool wanted)
 {
     if (gState != nullptr) {
@@ -2475,6 +2648,8 @@ bool mapRendererDrawGbuffer(int scale, const float* palette, const MapGbufferDra
     GbufferConstants constants = {};
     memcpy(constants.category, draw.category, sizeof(constants.category));
     constants.detailScale = draw.detailScale;
+    constants.paintedShadow = draw.sun ? paintedShadowStrength() : 1.0f;
+    gState->paintedFaded = constants.paintedShadow < 1.0f;
     constants.occluderOrigin[0] = draw.occluderOrigin[0];
     constants.occluderOrigin[1] = draw.occluderOrigin[1];
     constants.occluderSize[0] = draw.occluderSize[0];

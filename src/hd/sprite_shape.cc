@@ -307,16 +307,33 @@ namespace {
     {
         rgba[0] = static_cast<unsigned char>(lroundf(std::min(std::max(u * 0.5f + 0.5f, 0.0f), 1.0f) * 255.0f));
         rgba[1] = static_cast<unsigned char>(lroundf(std::min(std::max(z * 0.5f + 0.5f, 0.0f), 1.0f) * 255.0f));
-        long h = std::min(std::max(lroundf(heightPx * 16.0f), 0L), 65535L);
+        long h = std::min(std::max(lroundf(heightPx * 16.0f), 0L), 32767L); // A's top bit: painted shadow
         rgba[2] = static_cast<unsigned char>(h & 0xFF);
         rgba[3] = static_cast<unsigned char>(h >> 8);
     }
 
 } // namespace
 
-void spriteShape(const unsigned char* pixels, int width, int height, int objectType, unsigned char* rgba, float roundStrength)
+void spriteShape(const unsigned char* pixels, int width, int height, int objectType, unsigned char* rgba, float roundStrength, const unsigned char* shadowMask)
 {
     size_t count = static_cast<size_t>(width) * height;
+    if (shadowMask != nullptr) {
+        // The object without its painted shadow; the shadow lies flat on the ground.
+        std::vector<unsigned char> object(pixels, pixels + count);
+        for (size_t i = 0; i < count; i++) {
+            if (shadowMask[i] != 0) {
+                object[i] = 0;
+            }
+        }
+        spriteShape(object.data(), width, height, objectType, rgba, roundStrength, nullptr);
+        for (size_t i = 0; i < count; i++) {
+            if (shadowMask[i] != 0) {
+                put(rgba + i * 4, 0.0f, 1.0f, 0.0f);
+                rgba[i * 4 + 3] |= 0x80;
+            }
+        }
+        return;
+    }
     bool shaped = objectType == OBJ_TYPE_ITEM || objectType == OBJ_TYPE_CRITTER || objectType == OBJ_TYPE_SCENERY || objectType == OBJ_TYPE_WALL || objectType == OBJ_TYPE_MISC;
     if (!shaped) {
         for (size_t i = 0; i < count; i++) {

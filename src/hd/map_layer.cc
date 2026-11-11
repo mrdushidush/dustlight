@@ -520,12 +520,14 @@ namespace {
     }
 
     // What draws 1x pixel (x, y) last (art opaque there, in draw order), for
-    // the HD hole check: a translucent object, a pixel on the silhouette of
-    // its own frame (an 8-neighbor transparent or outside the frame), or
-    // neither (or nothing found).
+    // the HD hole check: a translucent object, a shadow painted into the art
+    // that the new light draws faint (mapRendererPaintedShadowTexel), a pixel
+    // on the silhouette of its own frame (an 8-neighbor transparent or
+    // outside the frame), or neither (or nothing found).
     constexpr int kUncoveredInterior = 0;
     constexpr int kUncoveredEdge = 1;
     constexpr int kUncoveredTranslucent = 2;
+    constexpr int kUncoveredPainted = 3;
 
     int classifyUncovered(int x, int y)
     {
@@ -553,6 +555,8 @@ namespace {
                 kind = kUncoveredInterior;
                 if (record.op == DrawOp::Object && record.blend != ObjectBlend::Normal) {
                     kind = kUncoveredTranslucent;
+                } else if (record.op == DrawOp::Object && mapRendererPaintedShadowTexel(record.fid, record.frame, record.rotation, w, h, fx, fy)) {
+                    kind = kUncoveredPainted;
                 } else {
                     for (int dy = -1; dy <= 1 && kind == kUncoveredInterior; dy++) {
                         for (int dx = -1; dx <= 1; dx++) {
@@ -944,6 +948,7 @@ namespace {
         int nearOpaque = 0;
         std::unordered_map<size_t, int> uncovered; // 1x pixel -> classifyUncovered
         int holes = 0;
+        int paintedPixels = 0;
         int softEdges = 0;
         float minSoftAlpha = 1.0f;
         int firstHoleX = 0;
@@ -986,7 +991,9 @@ namespace {
                     int kind = known != uncovered.end() ? known->second : (uncovered[q] = classifyUncovered(x / tier, y / tier));
                     bool soft = kind == kUncoveredTranslucent
                         || ((kind == kUncoveredEdge || bordersUndrawn(x / tier, y / tier)) && px[3] >= kMinSoftAlpha);
-                    if (soft) {
+                    if (kind == kUncoveredPainted) {
+                        paintedPixels++; // faint on purpose: the ground shows through
+                    } else if (soft) {
                         softEdges++;
                         minSoftAlpha = std::min(minSoftAlpha, px[3]);
                     } else if (px[3] >= kNearOpaque) {
@@ -1079,8 +1086,8 @@ namespace {
             writeRgbPng(base + "-hd.png", hdRgb, hdWidth, hdHeight);
             writeRgbPng(base + "-orig.png", exactRgb, hdWidth, hdHeight);
         }
-        debugPrint("HD: map self-test '%s' hd: %s (tier %d, %dx%d, %d holes, %d soft-edge px filled from the 1x map (lowest alpha %.3f), %d near-opaque px, min alpha %.4f, HD art on %d of %d frames, %d uploads; vs exact: PSNR %.1f dB, p99 %d, max %d, brightness %+.1f%% (post %+.1f%%); %d outline px from the exact pass; %s light%s)\n",
-            label, pass ? "PASS" : "FAIL", tier, hdWidth, hdHeight, holes, softEdges, softEdges > 0 ? minSoftAlpha : 1.0f, nearOpaque, minAlpha, art.buildHd, art.buildFrames, art.buildUploads, psnr, p99, maxError, drift, postDrift, outlinePixels,
+        debugPrint("HD: map self-test '%s' hd: %s (tier %d, %dx%d, %d holes, %d painted-shadow px, %d soft-edge px filled from the 1x map (lowest alpha %.3f), %d near-opaque px, min alpha %.4f, HD art on %d of %d frames, %d uploads; vs exact: PSNR %.1f dB, p99 %d, max %d, brightness %+.1f%% (post %+.1f%%); %d outline px from the exact pass; %s light%s)\n",
+            label, pass ? "PASS" : "FAIL", tier, hdWidth, hdHeight, holes, paintedPixels, softEdges, softEdges > 0 ? minSoftAlpha : 1.0f, nearOpaque, minAlpha, art.buildHd, art.buildFrames, art.buildUploads, psnr, p99, maxError, drift, postDrift, outlinePixels,
             newLight ? "new" : "original", art.forceOriginal ? "; original art forced" : "");
         if (!cycles.text.empty()) {
             debugPrint("HD: map self-test '%s' cycle: %s%s\n", label, cycles.text.c_str(), newLight ? " (new light: not checked)" : cycles.pass ? " PASS"

@@ -121,6 +121,10 @@ struct MapGbufferDraw {
     // Per category: detail strength, relief weight, shape weight, unused.
     float category[kLightCategoryCount][4] = {};
     float detailScale = 1.0f;
+    // Whether the sun (and its shadows) is on this frame. Without it
+    // ([hd_light] quality=low, or the sun switched off) the shadows painted
+    // into the art stay as painted, so objects keep a shadow.
+    bool sun = true;
 };
 
 // Draws the built commands unlit into the G-buffer at `scale` (must equal
@@ -130,6 +134,12 @@ bool mapRendererDrawGbuffer(int scale, const float* palette, const MapGbufferDra
 // The HD target at `scale` for the lighting pass to write (created if
 // needed; same texture as mapRendererHdView).
 ID3D11UnorderedAccessView* mapRendererHdUav(int scale);
+
+// Whether texel (x, y) of the frame (width x height) is part of a shadow
+// painted into the art that the new light draws faint ([hd_light]
+// painted_shadows below 1, and the sun on in the last G-buffer draw): the HD
+// self-test expects the ground to show through there.
+bool mapRendererPaintedShadowTexel(int fid, int frame, int rotation, int width, int height, int x, int y);
 
 } // namespace fallout::hd
 

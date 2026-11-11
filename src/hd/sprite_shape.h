@@ -25,14 +25,20 @@ namespace fallout::hd {
 //                  ground of what holds them up); others: above the frame's
 //                  bottom row (the feet)
 //
+//   painted shadow (`shadowMask`, 1 per texel; tools/scripts/painted_shadows.py)
+//                  the shadow painted on the ground beside the object: left out
+//                  of the object's silhouette, ground line and body; flat on
+//                  the ground itself (normal up, height 0, flagged)
+//
 // World axes: u = screen right, v = toward the viewer along the ground,
 // z = up. Output per texel, RGBA8:
 //   R, G  normal u and z as (n + 1) / 2 (v = sqrt(1 - u^2 - z^2), never < 0)
-//   B, A  height in 1/16 screen px, low byte / high byte
+//   B, A  height in 1/16 screen px, low byte / high 7 bits; A's top bit
+//         flags a painted shadow texel
 //
 // `objectType` is the art's OBJ_TYPE_*; tiles and interface art get no
 // shape (flat, height 0).
-void spriteShape(const unsigned char* pixels, int width, int height, int objectType, unsigned char* rgba, float roundStrength = 0.0f);
+void spriteShape(const unsigned char* pixels, int width, int height, int objectType, unsigned char* rgba, float roundStrength = 0.0f, const unsigned char* shadowMask = nullptr);
 
 } // namespace fallout::hd
 
