@@ -777,7 +777,8 @@ cbuffer Gbuffer : register(b1) {
     int2 gOccluderOrigin; // ground px (0, 0) in the occluder grid
     float gPaintedShadow; // [hd_light] painted_shadows: their strength, 1 = as painted
     int2 gOccluderSize;
-    int2 gOccluderPad2;
+    float gCheckerAlpha;  // [hd_light] checker_alpha: coverage of checkerboard regions, 1 = as drawn
+    int gOccluderPad3;
 };
 
 struct GbufOut {
@@ -821,9 +822,28 @@ float hdLuma(Sprite s, int2 q)
     return luma(gPool.Load(int4(s.hd.xy + q, s.hd.z, 0)).rgb);
 }
 
-float shapeHeight(float4 raw) { return (round(raw.b * 255.0) + float(uint(round(raw.a * 255.0)) & 127u) * 256.0) / 16.0; }
+// With [hd_light] checker_alpha on, A's bit 6 flags a checkerboard texel and
+// heights top out at 1023 px (checkerFlags in map_renderer.cc).
+float shapeHeight(float4 raw) { return (round(raw.b * 255.0) + float(uint(round(raw.a * 255.0)) & (gCheckerAlpha < 1.0 ? 63u : 127u)) * 256.0) / 16.0; }
 // A texel of a shadow painted into the art (sprite_shape.h): flat on the ground.
 bool shapePainted(float4 raw) { return (uint(round(raw.a * 255.0)) & 128u) != 0; }
+bool shapeChecker(float4 raw) { return (uint(round(raw.a * 255.0)) & 64u) != 0; }
+
+// How much of the target pixel lies in a checkerboard see-through region:
+// bilinear over the 1x texels, like paintedShadowAt.
+float checkerAt(Sprite s, int2 pix)
+{
+    float2 f = (float2(pix) + 0.5) / gScale - 0.5 - float2(s.origin);
+    int2 i0 = int2(floor(f));
+    float2 t = f - float2(i0);
+    float checker = 0.0;
+    [unroll] for (int k = 0; k < 4; k++) {
+        int2 e = clamp(i0 + int2(k & 1, k >> 1), int2(0, 0), s.size - 1);
+        float w = ((k & 1) != 0 ? t.x : 1.0 - t.x) * ((k >> 1) != 0 ? t.y : 1.0 - t.y);
+        checker += shapeChecker(gShape.Load(int3(s.src + e, 0))) ? w : 0.0;
+    }
+    return checker;
+}
 
 // How much of the target pixel lies on a painted shadow: bilinear over the
 // 1x texels, so the patch's edge stays soft at the HD scale.
@@ -920,6 +940,11 @@ GbufOut psGbuffer(VSOut i)
         painted = paintedShadowAt(s, pix);
         a = lerp(a, gPaintedShadow, painted);
         art.rgb = lerp(art.rgb, float3(0.04, 0.04, 0.04), painted);
+    }
+    // A checkerboard see-through region (map_renderer.cc checkerFlags) evenly
+    // at gCheckerAlpha instead of a dot grid.
+    if (gCheckerAlpha < 1.0 && s.op != OP_TRANS) {
+        a = lerp(a, gCheckerAlpha, checkerAt(s, pix) * (1.0 - painted));
     }
     if (a <= 0.0) {
         discard;
@@ -1079,7 +1104,8 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
         int occluderOrigin[2];
         float paintedShadow;
         int occluderSize[2];
-        int pad2[2];
+        float checkerAlpha;
+        int pad3;
     };
     static_assert(sizeof(GbufferConstants) == 176, "GbufferConstants must match the HLSL cbuffer");
 
@@ -1569,14 +1595,175 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
         return true;
     }
 
+    // Checkerboard see-through (the author, 2026-11-12, after the eye's patrol of
+    // 0.9.3). 71 original pieces fake translucency with a checkerboard of
+    // see-through pixels: the shadow sprites of the Vertibird, the shuttle,
+    // the Reno signs and the radar dish (already drawn evenly as painted
+    // shadows), dark roof tiles in tent doorways and on roof edges, black
+    // wall tops, exit grids (left as they are). Kept as is, HD shows a
+    // coarse dot grid, and the tiling edge fill rounds the dots along a
+    // region's border into dark beads. [hd_light] checker_alpha < 1 draws
+    // such regions evenly at that coverage; 1 leaves the art as it is. Default
+    // 0.5, the dither's own average, by the author's pick from a before/after of
+    // 14 tour views (2026-11-12, reports\art-lab\checker).
+    float checkerAlpha()
+    {
+        static const float value = [] {
+            double v = 0.5;
+            configGetDouble(&gGameConfig, "hd_light", "checker_alpha", &v);
+            return static_cast<float>(std::min(std::max(v, 0.0), 1.0));
+        }();
+        return value;
+    }
+
+    // The frame's checkerboard regions as one byte per texel (1 = in one)
+    // into `mask`; false when it has none. A texel is strict when its four
+    // sides have the other opacity and its four diagonals the same (a 3x3
+    // checkerboard around it); 8-connected strict texels make a region when
+    // there are at least 8 of them. Each region then takes, twice, the texels
+    // next to it that are still mostly checkerboard (6 of the 8 tests: its
+    // border rows), and last the see-through texels on its four sides, so
+    // the edge fill has nothing there to round into beads. 1 px diagonal
+    // lines score 6 too but have no strict texel, so they stay as drawn.
+    bool checkerRegions(const unsigned char* pixels, int width, int height, std::vector<unsigned char>& mask)
+    {
+        auto opaque = [&](int x, int y) {
+            x = std::min(std::max(x, 0), width - 1);
+            y = std::min(std::max(y, 0), height - 1);
+            return pixels[static_cast<size_t>(y) * width + x] != 0;
+        };
+        auto score = [&](int x, int y) {
+            bool o = opaque(x, y);
+            int s = 0;
+            s += opaque(x - 1, y) != o;
+            s += opaque(x + 1, y) != o;
+            s += opaque(x, y - 1) != o;
+            s += opaque(x, y + 1) != o;
+            s += opaque(x - 1, y - 1) == o;
+            s += opaque(x + 1, y - 1) == o;
+            s += opaque(x - 1, y + 1) == o;
+            s += opaque(x + 1, y + 1) == o;
+            return s;
+        };
+        size_t count = static_cast<size_t>(width) * height;
+        std::vector<unsigned char> strict(count, 0);
+        bool any = false;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                if (score(x, y) == 8) {
+                    strict[static_cast<size_t>(y) * width + x] = 1;
+                    any = true;
+                }
+            }
+        }
+        if (!any) {
+            return false;
+        }
+        mask.assign(count, 0);
+        std::vector<int> stack;
+        std::vector<int> part;
+        any = false;
+        for (size_t start = 0; start < count; start++) {
+            if (strict[start] != 1) {
+                continue;
+            }
+            part.clear();
+            stack.assign(1, static_cast<int>(start));
+            strict[start] = 2;
+            while (!stack.empty()) {
+                int i = stack.back();
+                stack.pop_back();
+                part.push_back(i);
+                int x = i % width;
+                int y = i / width;
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        int nx = x + dx;
+                        int ny = y + dy;
+                        if (nx >= 0 && ny >= 0 && nx < width && ny < height && strict[static_cast<size_t>(ny) * width + nx] == 1) {
+                            strict[static_cast<size_t>(ny) * width + nx] = 2;
+                            stack.push_back(ny * width + nx);
+                        }
+                    }
+                }
+            }
+            if (part.size() >= 8) {
+                for (int i : part) {
+                    mask[i] = 1;
+                }
+                any = true;
+            }
+        }
+        if (!any) {
+            return false;
+        }
+        std::vector<unsigned char> before;
+        for (int pass = 0; pass < 3; pass++) {
+            before = mask;
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    size_t i = static_cast<size_t>(y) * width + x;
+                    if (before[i] != 0 || (pass == 2 && opaque(x, y))) {
+                        continue;
+                    }
+                    bool touches = false;
+                    for (int dy = -1; dy <= 1 && !touches; dy++) {
+                        for (int dx = -1; dx <= 1 && !touches; dx++) {
+                            int nx = x + dx;
+                            int ny = y + dy;
+                            bool side = dx == 0 || dy == 0;
+                            if ((pass < 2 || side) && nx >= 0 && ny >= 0 && nx < width && ny < height && before[static_cast<size_t>(ny) * width + nx] != 0) {
+                                touches = true;
+                            }
+                        }
+                    }
+                    if (touches && (pass == 2 || score(x, y) >= 6)) {
+                        mask[i] = 1;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
     // The frame's shape (sprite_shape.h) into the shape atlas, at the
-    // entry's place.
+    // entry's place. With checker_alpha on, the checkerboard regions'
+    // see-through texels count as solid for the shape (no bumps at every
+    // hole) and are flagged in A's bit 6; heights then top out at 1023 px.
     void uploadShape(int fid, int frame, int rotation, AtlasEntry& entry, const unsigned char* data)
     {
         gState->shapeScratch.resize(static_cast<size_t>(entry.width) * entry.height * 4);
         std::vector<unsigned char> painted;
         bool hasPainted = paintedShadow(fid, frame, rotation, entry.width, entry.height, painted);
-        spriteShape(data, entry.width, entry.height, FrmId(fid).objectType(), gState->shapeScratch.data(), roundScenery(fid) ? roundBodyStrength() : 0.0f, hasPainted ? painted.data() : nullptr);
+        std::vector<unsigned char> checker;
+        std::vector<unsigned char> filled;
+        // Not the exit grids (misc art): they overlap one another, and where
+        // two even half-covers overlap they print rectangles; checkerboards
+        // of the same phase overlap without a trace.
+        bool hasChecker = checkerAlpha() < 1.0f && FrmId(fid).objectType() != OBJ_TYPE_MISC && checkerRegions(data, entry.width, entry.height, checker);
+        const unsigned char* shapeSource = data;
+        if (hasChecker) {
+            filled.assign(data, data + static_cast<size_t>(entry.width) * entry.height);
+            for (size_t i = 0; i < filled.size(); i++) {
+                if (checker[i] != 0 && filled[i] == 0) {
+                    filled[i] = 1;
+                }
+            }
+            shapeSource = filled.data();
+        }
+        spriteShape(shapeSource, entry.width, entry.height, FrmId(fid).objectType(), gState->shapeScratch.data(), roundScenery(fid) ? roundBodyStrength() : 0.0f, hasPainted ? painted.data() : nullptr);
+        if (checkerAlpha() < 1.0f) {
+            unsigned char* rgba = gState->shapeScratch.data();
+            for (size_t i = 0; i < static_cast<size_t>(entry.width) * entry.height; i++) {
+                if ((rgba[i * 4 + 3] & 0x40) != 0) {
+                    rgba[i * 4 + 2] = 0xFF;
+                    rgba[i * 4 + 3] = static_cast<unsigned char>((rgba[i * 4 + 3] & 0x80) | 0x3F);
+                }
+                if (hasChecker && checker[i] != 0) {
+                    rgba[i * 4 + 3] |= 0x40;
+                }
+            }
+        }
         D3D11_BOX box = { static_cast<UINT>(entry.x), static_cast<UINT>(entry.y), 0, static_cast<UINT>(entry.x + entry.width), static_cast<UINT>(entry.y + entry.height), 1 };
         gState->context->UpdateSubresource(gState->shapeAtlas.Get(), 0, &box, gState->shapeScratch.data(), entry.width * 4, 0);
         entry.hasShape = true;
@@ -2650,6 +2837,7 @@ bool mapRendererDrawGbuffer(int scale, const float* palette, const MapGbufferDra
     constants.detailScale = draw.detailScale;
     constants.paintedShadow = draw.sun ? paintedShadowStrength() : 1.0f;
     gState->paintedFaded = constants.paintedShadow < 1.0f;
+    constants.checkerAlpha = checkerAlpha();
     constants.occluderOrigin[0] = draw.occluderOrigin[0];
     constants.occluderOrigin[1] = draw.occluderOrigin[1];
     constants.occluderSize[0] = draw.occluderSize[0];

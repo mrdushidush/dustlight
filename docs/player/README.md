@@ -74,6 +74,7 @@ Everything is in `fallout2.cfg` in the game folder.
 | `[hd_light] sun_path=0` | The sun stays where it is at noon all day, as in 0.9.0. |
 | `[hd_light] round_body=0` | Trees, cacti, bushes, rocks and barrels without their rounder look (default 0.5; up to about 1.5 for more). |
 | `[hd_light] painted_shadows=1` | The black shadows painted into the original art under buildings and scenery, as in 0.9.2 (default 0.15, very faint; 0 removes them). |
+| `[hd_light] checker_alpha=1` | The original art's see-through checkerboards (tent doorways, roof edges, black wall tops) as a dot grid, as in 0.9.2 (default 0.5, evenly half see-through). |
 | `[hd_post] enabled=0` | No film grain or vignette. |
 | `[hd] ui_hd=0` | The original interface art. |
 | `[hd] ui_text_style=sharp` | HD text style: `model` (default), `sharp` or `smooth`. |

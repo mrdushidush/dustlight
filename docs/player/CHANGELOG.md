@@ -9,6 +9,10 @@ A new engine only: the 0.9.2-beta art packs stay as they are.
   the new light's own shadows take their place. `[hd_light] painted_shadows=1` brings them
   back (0 removes them). Characters and creatures keep theirs, and with `quality=low` (no
   sun) they all stay as painted.
+- Tent doorways, roof edges and the tops of black walls that the original art makes
+  see-through with a checkerboard of pixels are now evenly half see-through, without the dot
+  grid and the dark beads along its edge. `[hd_light] checker_alpha=1` brings the
+  checkerboard back.
 
 ## 0.9.2-beta
 
