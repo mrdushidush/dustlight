@@ -575,6 +575,100 @@ namespace {
         return kind;
     }
 
+    // What draws each 1x pixel last, in draw order, for the eye patrol (`<label>-kind.png`, gray = kind * 16):
+    // it drops flags on what is drawn from the original pixels or moves on purpose (characters, exit grids, the
+    // target marker, text, outlines). Egg cut-outs are ignored.
+    enum PixelKind : unsigned char {
+        kKindNone,
+        kKindFloor,
+        kKindRoof,
+        kKindWall,
+        kKindScenery,
+        kKindItem,
+        kKindCritter,
+        kKindMisc,
+        kKindInterface,
+        kKindTranslucent,
+        kKindText,
+        kKindOutline,
+    };
+
+    std::vector<unsigned char> pixelKinds(const std::vector<unsigned char>& tags, int width, int height)
+    {
+        std::vector<unsigned char> kinds(static_cast<size_t>(width) * height, kKindNone);
+        auto paintBox = [&](const DrawRecord& record, int boxWidth, int boxHeight, auto&& drawn, unsigned char kind) {
+            int left = std::max({ record.x, record.clip.left, 0 });
+            int top = std::max({ record.y, record.clip.top, 0 });
+            int right = std::min({ record.x + boxWidth - 1, record.clip.right, width - 1 });
+            int bottom = std::min({ record.y + boxHeight - 1, record.clip.bottom, height - 1 });
+            for (int py = top; py <= bottom; py++) {
+                for (int px = left; px <= right; px++) {
+                    if (drawn(px - record.x, py - record.y)) {
+                        kinds[static_cast<size_t>(py) * width + px] = kind;
+                    }
+                }
+            }
+        };
+        for (const DrawRecord& record : drawRecords()) {
+            if (record.op == DrawOp::Text) {
+                paintBox(record, record.width, record.height, [](int, int) { return true; }, kKindText);
+                continue;
+            }
+            if (record.op != DrawOp::Floor && record.op != DrawOp::Roof && record.op != DrawOp::Object) {
+                continue;
+            }
+            unsigned char kind = record.op == DrawOp::Floor ? kKindFloor : kKindRoof;
+            if (record.op == DrawOp::Object) {
+                switch (FrmId(record.fid).objectType()) {
+                case OBJ_TYPE_ITEM:
+                    kind = kKindItem;
+                    break;
+                case OBJ_TYPE_CRITTER:
+                    kind = kKindCritter;
+                    break;
+                case OBJ_TYPE_SCENERY:
+                    kind = kKindScenery;
+                    break;
+                case OBJ_TYPE_WALL:
+                    kind = kKindWall;
+                    break;
+                case OBJ_TYPE_MISC:
+                    kind = kKindMisc;
+                    break;
+                default:
+                    kind = kKindInterface;
+                    break;
+                }
+                if (record.blend != ObjectBlend::Normal && record.blend != ObjectBlend::Interface) {
+                    kind = kKindTranslucent;
+                }
+            }
+            CacheEntry* handle;
+            Art* art = artLock(FrmId(record.fid), &handle);
+            if (art == nullptr) {
+                continue;
+            }
+            int frame = record.op == DrawOp::Object ? record.frame : 0;
+            Rotation rotation = static_cast<Rotation>(record.op == DrawOp::Object ? record.rotation : 0);
+            int w = 0;
+            int h = 0;
+            artGetSize(art, frame, rotation, &w, &h);
+            const unsigned char* data = artGetFrameData(art, frame, rotation);
+            if (data != nullptr) {
+                int boxWidth = record.op == DrawOp::Object ? std::min(w, record.width) : w;
+                int boxHeight = record.op == DrawOp::Object ? std::min(h, record.height) : h;
+                paintBox(record, boxWidth, boxHeight, [&](int fx, int fy) { return data[fy * w + fx] != 0; }, kind);
+            }
+            artUnlock(handle);
+        }
+        for (size_t q = 0; q < kinds.size(); q++) {
+            if (tags[q] != 0 && kinds[q] != kKindText) {
+                kinds[q] = kKindOutline;
+            }
+        }
+        return kinds;
+    }
+
     // Before the forced refresh: map pixels where the composite falls back
     // to CE's pixel because the GPU map disagrees with the screen. Measures
     // how well the per-present emission tracks CE's incremental redraws.
@@ -1085,6 +1179,12 @@ namespace {
             std::string base = gState->reportDir + "\\" + label;
             writeRgbPng(base + "-hd.png", hdRgb, hdWidth, hdHeight);
             writeRgbPng(base + "-orig.png", exactRgb, hdWidth, hdHeight);
+            std::vector<unsigned char> kinds = pixelKinds(tags, width, height);
+            std::vector<unsigned char> kindRgb(kinds.size() * 3);
+            for (size_t q = 0; q < kinds.size(); q++) {
+                kindRgb[q * 3] = kindRgb[q * 3 + 1] = kindRgb[q * 3 + 2] = static_cast<unsigned char>(kinds[q] * 16);
+            }
+            writeRgbPng(base + "-kind.png", kindRgb, width, height);
         }
         debugPrint("HD: map self-test '%s' hd: %s (tier %d, %dx%d, %d holes, %d painted-shadow px, %d soft-edge px filled from the 1x map (lowest alpha %.3f), %d near-opaque px, min alpha %.4f, HD art on %d of %d frames, %d uploads; vs exact: PSNR %.1f dB, p99 %d, max %d, brightness %+.1f%% (post %+.1f%%); %d outline px from the exact pass; %s light%s)\n",
             label, pass ? "PASS" : "FAIL", tier, hdWidth, hdHeight, holes, paintedPixels, softEdges, softEdges > 0 ? minSoftAlpha : 1.0f, nearOpaque, minAlpha, art.buildHd, art.buildFrames, art.buildUploads, psnr, p99, maxError, drift, postDrift, outlinePixels,

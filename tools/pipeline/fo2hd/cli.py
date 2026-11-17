@@ -79,8 +79,67 @@ def cmd_replay(args) -> int:
 
 def cmd_dat_list(args) -> int:
     files = _game_files(args)
-    for path in sorted(files.list()):
-        print(path)
+    if args.layers:
+        for p in files.layer_paths:
+            print(p)
+        return 0
+    for path, layer in sorted(files.list().items()):
+        print(f"{path}\t{layer.path}" if args.where else path)
+    return 0
+
+
+def cmd_art_diff(args) -> int:
+    from . import artdiff
+    from .config import ini_path, read_ini
+
+    ini = read_ini()
+    fo1 = ini["fo1"] if ini.has_section("fo1") else {}
+    base = args.base or fo1.get("base_ini")
+    if not base:
+        raise SystemExit("art-diff: --base <ini or game folder> (or [fo1] base_ini in the ini)")
+    base_path = Path(base)
+    base_game = base_path if base_path.is_dir() else load_paths(ini_path(base_path)).working_copy
+    base_art = Path(args.base_art or fo1.get("base_art") or base_game / "hd")
+    if not (base_art / "art").is_dir():
+        raise SystemExit(f"art-diff: no packs under {base_art}\\art")
+    game = _game_files(args)
+    print(f"game: {game.game_dir}\nbase: {base_game}\nbase art: {base_art}")
+    result = artdiff.diff(game, GameFiles(base_game), base_art)
+    out = Path(args.out) if args.out else _paths(args).data_root / "artdiff"
+    manifest = artdiff.write(result, out)
+    artdiff.report(result, manifest)
+    print(f"-> {out}")
+    return 0
+
+
+def cmd_art_skeletons(args) -> int:
+    import json
+
+    from . import artdiff
+
+    root = _paths(args).data_root
+    manifest_path = Path(args.manifest) if args.manifest else root / "artdiff" / "build_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    out = Path(args.out) if args.out else root / "skeleton"
+    folders = [f.strip() for f in args.folders.split(",") if f.strip()]
+    written = artdiff.write_skeletons(manifest, _game_files(args), out, folders)
+    print(f"art-skeletons: {written} written for {', '.join(folders)} -> {out}")
+    return 0
+
+
+def cmd_art_twins(args) -> int:
+    import json
+
+    from . import artdiff
+    from .config import read_ini
+
+    root = _paths(args).data_root
+    ini = read_ini()
+    base_art = Path(args.base_art or (ini["fo1"].get("base_art") if ini.has_section("fo1") else ""))
+    twins = json.loads((Path(args.twins) if args.twins else root / "artdiff" / "twins.json").read_text(encoding="utf-8"))
+    out = Path(args.out)
+    done, skipped = artdiff.copy_twins(twins, base_art, out)
+    print(f"art-twins: {done} packs copied from {base_art}, {skipped} already there -> {out}")
     return 0
 
 
@@ -208,15 +267,25 @@ def cmd_release(args) -> int:
         key, _, value = spec.partition("=")
         # @file: the value is that file's text (long fields like the known issues)
         fields[key] = Path(value[1:]).read_text(encoding="utf-8").strip() if value.startswith("@") else value
+    if not args.art_only and not (args.exe and args.ce_dat):
+        raise SystemExit("release: --exe and --ce-dat are required (or --art-only)")
+    art_files = []
+    for spec in args.art_file or []:
+        src, _, arc = spec.partition("=")
+        art_files.append((Path(src), arc or Path(src).name))
     info = release.build(
         name=args.name,
         version=args.version,
-        exe=Path(args.exe),
-        exe_name=args.exe_name or Path(args.exe).name,
-        ce_dat=Path(args.ce_dat),
+        exe=Path(args.exe) if args.exe else None,
+        exe_name=args.exe_name or (Path(args.exe).name if args.exe else ""),
+        ce_dat=Path(args.ce_dat) if args.ce_dat else None,
         docs=docs,
         hdpack=Path(args.hdpack) if args.hdpack else paths.data_root / "hdpack",
-        pristine=paths.pristine,
+        pristine=Path(args.pristine) if args.pristine else paths.pristine,
+        art_only=args.art_only,
+        art_prefix=args.art_prefix,
+        art_label=args.art_label,
+        art_files=art_files,
         out=Path(args.out),
         tiers=[] if args.tiers.strip().lower() == "none" else [int(t) for t in args.tiers.split(",")],
         max_part_bytes=int(float(args.max_part_gb) * 1e9),
@@ -617,7 +686,7 @@ def cmd_maps(args) -> int:
     from . import maps
 
     paths = _paths(args)
-    result = maps.scan(_game_files(args))
+    result = maps.scan(_game_files(args), listed_only=args.listed)
     out = paths.data_root / "maps"
     out.mkdir(parents=True, exist_ok=True)
     (out / "scan.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
@@ -630,6 +699,156 @@ def cmd_maps(args) -> int:
     print(f"maps: {len(result['maps'])} files ({sum(m['listed'] for m in result['maps'])} in maps.txt), {elevations} elevations")
     print(f"tiles used: {len(result['tiles'])}; as roofs (mostly): {len(roofs)}; used both ways: {len(both)}")
     print(f"tour: {len(scenes)} views -> {out / 'tour.json'}")
+    return 0
+
+
+def cmd_eye_bench(args) -> int:
+    import subprocess
+    import time
+
+    from . import eye
+
+    paths = _paths(args)
+    run = Path(args.run) if Path(args.run).is_dir() else paths.reports / "tour" / args.run
+    stills = [(run / f"{v}-hd.png", run / f"{v}-orig.png") for v in args.views.split(",")]
+    missing = [str(p) for pair in stills for p in pair if not p.exists()]
+    if missing:
+        raise SystemExit("missing stills: " + ", ".join(missing))
+    out = Path(args.out) if args.out else paths.reports / "eye" / ("bench-" + time.strftime("%Y%m%d-%H%M"))
+    failed = 0
+    for model in args.models:
+        safe = model.replace("/", "_").replace("@", "_")
+        try:
+            result = eye.bench(model, stills, out / safe, cols=args.cols, rows=args.rows)
+            print(eye.bench_summary(result), flush=True)
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+            failed += 1
+            print(f"{model}: FAILED: {exc}", flush=True)
+            eye.unload_all()
+    print(f"-> {out}")
+    return 1 if failed else 0
+
+
+def _eye_dirs(args):
+    """The eye's folders. They live in the release data root (look pages, tour/p093-wide, artifact-crops)."""
+    paths = _paths(args)
+    lab = Path(args.lab) if args.lab else paths.reports / "art-lab"
+    key = Path(args.key) if args.key else paths.data_root / "art-lab-data" / "eye" / "key"
+    return paths, lab, key
+
+
+def cmd_eye_key(args) -> int:
+    from . import eye_key
+
+    paths, lab, key = _eye_dirs(args)
+    run = Path(args.run) if Path(args.run).is_dir() else paths.reports / "tour" / args.run
+    summary = eye_key.build(lab, paths.reports / "artifact-crops", run, key, seed=args.seed)
+    for name, counts in summary.items():
+        print(f"{name:20s} {counts['full']:4d} items, {counts['core']:4d} in the core set")
+    print(f"total {sum(c['full'] for c in summary.values())}, core {sum(c['core'] for c in summary.values())} -> {key}")
+    return 0
+
+
+def cmd_eye_contest(args) -> int:
+    import subprocess
+
+    from . import eye, eye_contest, eye_key
+
+    paths, lab, key = _eye_dirs(args)
+    items = eye_contest.select(eye_key.load_key(key), args.subset)
+    if args.task:
+        items = [i for i in items if i["task"] == args.task]
+    runs = lab / "eye" / "runs"
+    models = args.models or [c.key for c in eye_contest.CONTESTANTS]
+    if args.dry:
+        listing = eye_contest.lms_models()
+        total = 0.0
+        print(f"{args.subset} set: {len(items)} items "
+              f"({sum(1 for i in items if i['task'] == 'vote')} votes, {sum(1 for i in items if i['task'] == 'defects')} defect checks)")
+        for model in models:
+            c = eye_contest.BY_KEY.get(model) or eye_contest.Contestant(model, args.split or 1, 8.0, "not in the E1 list")
+            if args.split:
+                c = eye_contest.Contestant(c.key, args.split, c.e0_seconds, c.note)
+            calls = sum(c.split * c.split if i["task"] == "defects" else 1 for i in items)
+            seconds = sum(eye_contest.call_seconds_estimate(i, c) for i in items) + 90  # + load
+            total += seconds
+            cfg_path, cfg = eye_contest.saved_config(model, listing)
+            weights = listing.get(model, {}).get("path", "NOT IN lms ls")
+            print(f"\n{model}  [{c.note}]\n  weights {weights}\n  config  {eye_contest.config_line(cfg)}"
+                  f"\n  flags   --parallel 1{' ' + ' '.join(eye.LOAD_ARGS.get(model, ())) if model in eye.LOAD_ARGS else ''}"
+                  f"\n  {calls} calls (defect crops cut {c.split}x{c.split}), ~{seconds / 60:.0f} min (rough, from E0 speeds)")
+        print(f"\nall: ~{total / 3600:.1f} h")
+        return 0
+    failed = 0
+    for model in models:
+        c = eye_contest.BY_KEY.get(model)
+        split = args.split or (c.split if c else 1)
+        run_dir = runs / eye_contest.safe_name(model) / f"r{args.run}"
+        try:
+            eye_contest.run_model(model, items, run_dir, split=split, vote_ref=not args.no_ref,
+                                  temperature=args.temperature, seed=args.run if args.temperature > 0 else None,
+                                  any_hour=args.any_hour)
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+            failed += 1
+            print(f"{model}: FAILED: {exc}", flush=True)
+            if not model.startswith("fake:"):
+                eye.unload_all()
+    return cmd_eye_score(args) or (1 if failed else 0)
+
+
+def cmd_eye_patrol(args) -> int:
+    import subprocess
+    from collections import Counter
+
+    from . import eye, eye_contest, eye_patrol
+
+    paths, lab, _ = _eye_dirs(args)
+    run = Path(args.run) if Path(args.run).is_dir() else paths.reports / "tour" / args.run
+    name = run.name + (f"-{args.pair}" if args.pair else "")  # pair crops never mix with still crops
+    items = eye_patrol.build_items(run, paths.data_root / "art-lab-data" / "eye" / "patrol" / name, pair=args.pair)
+    if args.views:
+        wanted = set(args.views.split(","))
+        items = [i for i in items if i["view"] in wanted]
+    out = lab / "eye" / "patrol" / name / eye_contest.safe_name(args.model)
+    if not args.sheets_only:
+        try:
+            eye_contest.run_model(args.model, items, out, split=1, vote_ref=False, temperature=0.0, any_hour=args.any_hour)
+        except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+            print(f"{args.model}: FAILED: {exc}", flush=True)
+            if not args.model.startswith("fake:"):
+                eye.unload_all()
+            return 1
+    answers = eye_contest.read_answers(out / "answers.jsonl")
+    found = eye_patrol.flags(items, answers)
+    every = len(found)
+    found = eye_patrol.drop_skipped(items, found)
+    written = eye_patrol.sheets(items, found, out / "sheets", min_severity=args.min_severity)
+    flagged = len({f["crop"] for f in found})
+    print(f"{len(answers)}/{len(items)} crops answered, {flagged} with flags, {len(found)} flags "
+          f"({every - len(found)} dropped on characters, exit grids, markers, text); "
+          f"by severity {dict(sorted(Counter(f['severity'] for f in found).items(), key=str))}; "
+          f"by kind {dict(Counter(f['kind'] for f in found).most_common())}")
+    print(f"-> {len(written)} sheets (severity >= {args.min_severity}) in {out / 'sheets'}")
+    return 0
+
+
+def cmd_eye_score(args) -> int:
+    import json
+
+    from . import eye_contest, eye_key
+
+    paths, lab, key = _eye_dirs(args)
+    items = eye_key.load_key(key)
+    scores = eye_contest.score_all(lab / "eye" / "runs", items)
+    out = lab / "eye"
+    (out / "scorecard.json").write_text(json.dumps(scores, indent=1), encoding="utf-8")
+    eye_contest.page(scores, items, out / "scorecard.html")
+    for s in scores:
+        d = s["author"]
+        print(f"{s['model']:32s} {s['run']}: The author {d['score']} (n {d['n']}), planted "
+              f"{s['planted_found_l1']['rate']}/{s['planted_found_l2']['rate']}, clean flagged {s['clean_flagged']['rate']}, "
+              f"marks {s['marks_found']['rate']}, {s['seconds_per_call']} s/call")
+    print(f"-> {out / 'scorecard.html'}")
     return 0
 
 
@@ -652,7 +871,27 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=cmd_replay)
 
     p = sub.add_parser("dat-list", help="list every file the game can see, after archive precedence")
+    p.add_argument("--layers", action="store_true", help="only the archives and folders, highest priority first")
+    p.add_argument("--where", action="store_true", help="each file's archive or folder too (tab-separated)")
     p.set_defaults(func=cmd_dat_list)
+
+    p = sub.add_parser("art-diff", help="P8.1: every art file a game on Fallout 2's files (Et Tu) draws, against the base game's packs -> build manifest")
+    p.add_argument("--base", help="the base game: its machine-paths ini (working_copy) or game folder (default: [fo1] base_ini)")
+    p.add_argument("--base-art", help="the base game's pack folder (default: [fo1] base_art, else <base game>\\hd)")
+    p.add_argument("--out", help="output folder (default: <data_root>/artdiff)")
+    p.set_defaults(func=cmd_art_diff)
+
+    p = sub.add_parser("art-skeletons", help="P8.4: pack.json (layout + frame hashes, no atlases) for build-manifest files without any pack, for art_x16.py --source")
+    p.add_argument("--manifest", help="art-diff's build manifest (default: <data_root>/artdiff/build_manifest.json)")
+    p.add_argument("--folders", default="critters", help="comma-separated art folders (default: critters)")
+    p.add_argument("--out", help="output folder (default: <data_root>/skeleton); packs go to <out>/art/<folder>/<name>")
+    p.set_defaults(func=cmd_art_skeletons)
+
+    p = sub.add_parser("art-twins", help="P8.4: copy each twin's base pack under its own name (atlases hard-linked)")
+    p.add_argument("--out", required=True, help="the game's own art folder (packs go to <out>/art/...)")
+    p.add_argument("--twins", help="art-diff's twins.json (default: <data_root>/artdiff/twins.json)")
+    p.add_argument("--base-art", help="the base game's pack folder (default: [fo1] base_art)")
+    p.set_defaults(func=cmd_art_twins)
 
     p = sub.add_parser("dat-extract", help="extract one file as the game sees it")
     p.add_argument("path")
@@ -684,9 +923,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("release", help="R5: engine zip + per-tier art zips for players, with the release checks")
     p.add_argument("--name", required=True, help="release name (file names, pack markers)")
     p.add_argument("--version", required=True)
-    p.add_argument("--exe", required=True, help="built engine exe")
+    p.add_argument("--exe", help="built engine exe (required unless --art-only)")
     p.add_argument("--exe-name", help="file name of the exe in the zip (default: as built)")
-    p.add_argument("--ce-dat", required=True, help="built ce.dat (out/dist/ce.dat)")
+    p.add_argument("--ce-dat", help="built ce.dat (out/dist/ce.dat; required unless --art-only)")
     p.add_argument("--doc", action="append", help="source=name in the zip, e.g. docs/player/README.md=Relit-README.md")
     p.add_argument("--hdpack", help="runtime packs (default: <data_root>/hdpack)")
     p.add_argument("--out", required=True)
@@ -696,6 +935,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--field", action="append", help="key=value (or key=@file) for {key} in the docs, e.g. known_issues=@docs/player/known_issues.md")
     p.add_argument("--page", help="store page text (docs/player/nexus.md): filled and written next to the zips, in no zip")
     p.add_argument("--docs-only", action="store_true", help="only write the filled docs to --out, to read them before a build")
+    p.add_argument("--art-only", action="store_true", help="P8.7: only the art zips of --hdpack (no engine zip, no docs), e.g. Fallout 1's art")
+    p.add_argument("--art-prefix", default="hd", help="the art folder the zips unpack into (hd-fo1 for Fallout 1's art)")
+    p.add_argument("--art-label", default="art", help="zip name part: <name>-<version>-<label>-<N>x.zip (art-fo1)")
+    p.add_argument("--art-file", action="append", help="source=path under --art-prefix, in every tier's zip (painted_shadows.json)")
+    p.add_argument("--pristine", help="game folder whose files nothing shipped may equal (default: [paths] pristine; Et Tu's folder for Fallout 1)")
     p.set_defaults(func=cmd_release)
 
     p = sub.add_parser("release-media", help="R7: side by sides and whole screens per place from a tour run -> local page to choose from")
@@ -774,6 +1018,7 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=cmd_report7)
 
     p = sub.add_parser("maps", help="P7: scan every map file -> tile usage (floors/roofs) and the capture tour")
+    p.add_argument("--listed", action="store_true", help="only the maps data\\maps.txt names (Fallout Et Tu: its own 86, not Fallout 2's leftovers)")
     p.set_defaults(func=cmd_maps)
 
     p = sub.add_parser("fonts-review", help="P7b.5: the game's AAF fonts at 3x today vs HD glyph candidates (local page)")
@@ -783,6 +1028,54 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("fonts", help="P7b.5: HD glyph atlases (upscaler, smooth, sharp at 2x/3x/4x) -> <data_root>/hdpack/fonts")
     p.add_argument("--no-model", action="store_true", help="skip the upscaler style (it runs on the CPU)")
     p.set_defaults(func=cmd_fonts)
+
+    p = sub.add_parser("eye-bench", help="the eye, E0: speed + plumbing check of local vision models in LM Studio (parallel 1, the author's saved configs)")
+    p.add_argument("models", nargs="+", help="exact LM Studio model keys (lms load fuzzy-matches a missing key: use `lms ls`)")
+    p.add_argument("--run", default="p093-wide", help="tour run folder, or its name under <data_root>/reports/tour (-hd/-orig stills; p093-wide lives in the release data root)")
+    p.add_argument("--views", default="klamall_e0_0,arcaves_e2_1,navarro_e0_1", help="comma-separated view names")
+    p.add_argument("--cols", type=int, default=4, help="crop grid columns over the map (4 x 2 ~ 890x600 px: Qwen size; 8 x 4 for Gemma)")
+    p.add_argument("--rows", type=int, default=2, help="crop grid rows")
+    p.add_argument("--out", help="output folder (default <data_root>/reports/eye/bench-<time>)")
+    p.set_defaults(func=cmd_eye_bench)
+
+    def eye_dirs(p):
+        p.add_argument("--lab", help="art-lab reports folder (default <data_root>/reports/art-lab; use the release data root)")
+        p.add_argument("--key", help="answer key folder (default <data_root>/art-lab-data/eye/key)")
+
+    p = sub.add_parser("eye-key", help="the eye, E1: build the answer key (the author's votes + marks, planted defects); CPU only")
+    eye_dirs(p)
+    p.add_argument("--run", default="p093-wide", help="tour run with clean -hd/-orig stills for the planted defects")
+    p.add_argument("--seed", type=int, default=1112)
+    p.set_defaults(func=cmd_eye_key)
+
+    p = sub.add_parser("eye-contest", help="the eye, E1: models answer the key (GPU: The author approves configs and start), then eye-score")
+    eye_dirs(p)
+    p.add_argument("models", nargs="*", help="exact LM Studio keys (default: the E1 list); fake:oracle / fake:random check the scorer")
+    p.add_argument("--subset", choices=["core", "full"], default="core", help="core ~270 items (all models), full ~720 (the best few)")
+    p.add_argument("--run", type=int, default=1, help="run number: repeats size each model's error bar")
+    p.add_argument("--temperature", type=float, default=0.0, help="0 for run 1; repeats use >0 with seed = run")
+    p.add_argument("--split", type=int, help="cut defect crops split x split (default per model: Gemma 2)")
+    p.add_argument("--no-ref", action="store_true", help="votes without the original as reference (as the author voted)")
+    p.add_argument("--task", choices=["vote", "defects"], help="only this part of the key")
+    p.add_argument("--any-hour", action="store_true", help="run 16:00-19:00 in May-September too (only when the author waives it)")
+    p.add_argument("--dry", action="store_true", help="print models, the author's saved configs, calls and a time estimate; no GPU")
+    p.set_defaults(func=cmd_eye_contest)
+
+    p = sub.add_parser("eye-patrol", help="the eye, E2 trial: one model checks every 880x600 map crop of a tour run; review sheets")
+    eye_dirs(p)
+    p.add_argument("model", nargs="?", default="qwen3.6-35b-a3b-mtp@iq3_s", help="exact LM Studio key (default: the champion)")
+    p.add_argument("--run", default="p093-wide", help="tour run with -hd/-orig stills")
+    p.add_argument("--pair", help="crop a map self-test's same-frame pair instead of the stills, e.g. auto-000 "
+                                  "(<view>-fail-auto-000-hd.png / -orig.png: no critter moves, no grain, no UI)")
+    p.add_argument("--views", help="comma-separated view names (default: all)")
+    p.add_argument("--min-severity", type=int, default=1, help="flags drawn on the review sheets from this severity up")
+    p.add_argument("--sheets-only", action="store_true", help="no model: redraw the sheets from the answers so far")
+    p.add_argument("--any-hour", action="store_true", help="run 16:00-19:00 in May-September too (only when the author waives it)")
+    p.set_defaults(func=cmd_eye_patrol)
+
+    p = sub.add_parser("eye-score", help="the eye, E1: score every contest run -> art-lab/eye/scorecard.html")
+    eye_dirs(p)
+    p.set_defaults(func=cmd_eye_score)
 
     p = sub.add_parser("selftest", help="P1.4 acceptance: compare reader/decoder with ce-dat-tool and ce-frm2png")
     p.set_defaults(func=cmd_selftest)

@@ -108,12 +108,17 @@ class Upscaler:
         t = torch.from_numpy(np.ascontiguousarray(batch)).to(self.device).permute(0, 3, 1, 2).float().div_(255.0)
         if self.half:
             t = t.half()
+        oom = False
         try:
             out = t
             for d in self.descriptors:
                 out = d(out)
         except torch.OutOfMemoryError:
-            del t
+            # Recover after the handler: inside it, the exception's traceback keeps the failed call's
+            # activations alive (P8.4: 7.8 of 8 GB still held, so even the smallest tiles ran out).
+            oom = True
+        if oom:
+            out = t = None
             torch.cuda.empty_cache()
             if batch.shape[0] == 1:
                 if max(batch.shape[1], batch.shape[2]) <= tile:

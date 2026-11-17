@@ -131,13 +131,17 @@ def spots(floor_ids: np.ndarray, entering_tile: int | None = None) -> list[tuple
     return out
 
 
-def scan(files: GameFiles) -> dict:
+def scan(files: GameFiles, listed_only: bool = False) -> dict:
+    """listed_only: only the maps data\\maps.txt names. Fallout Et Tu (Phase 8) lists 86 of the 227 map files it can
+    read; the rest are Fallout 2's maps still in master.dat, and their tiles would skew the roof roles and the tour."""
     tiles_lst = files.read("art\\tiles\\tiles.lst").decode("latin-1").splitlines()
     listed = read_maps_txt(files)
     usage: dict[int, dict] = {}
     maps = []
     for path in sorted(p for p in files.list() if p.startswith("maps\\") and p.endswith(".map")):
         stem = path.split("\\")[-1][:-4]
+        if listed_only and stem not in listed:
+            continue
         m = parse(files.read(path))
         entry = {
             "file": stem + ".map",

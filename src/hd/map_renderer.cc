@@ -21,12 +21,14 @@
 #include "game_config.h"
 #include "hd/d3d11_shared.h"
 #include "hd/draw_list.h"
+#include "hd/first_run.h"
 #include "hd/hd_art.h"
 #include "hd/json_reader.h"
 #include "hd/sprite_shape.h"
 #include "map.h"
 #include "obj_types.h"
 #include "object.h"
+#include "platform_compat.h"
 #include "tile.h"
 
 using Microsoft::WRL::ComPtr;
@@ -1442,7 +1444,7 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
     // barrels should look more 3D) gets a rounded body (sprite_shape.h) of
     // [hd_light] round_body strength and its own light category (round=).
     // Known by art name; cliffs, fences and buildings stay as they were.
-    // Default 0.5: the author's blind vote of 2026-11-10 (0.5 won 5 of 6 against
+    // Default 0.5: The author's blind vote of 2026-11-10 (0.5 won 5 of 6 against
     // 0, 1 and 1.5; "the difference was very hard to tell").
     float roundBodyStrength()
     {
@@ -1510,6 +1512,10 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
         std::vector<int> runs; // y, x, length
     };
 
+    // P8.2: painted_shadows.json of each art folder ([hd] hd_art_dir, in
+    // order), then hd\painted_shadows.json in the game folder (where the
+    // engine zip puts it) if hd isn't one of them; a sprite's masks come from
+    // the first file that lists it (Fallout 1's art before Fallout 2's).
     const std::unordered_map<std::string, std::vector<PaintedShadowMask>>& paintedShadowMasks()
     {
         static const auto table = [] {
@@ -1517,34 +1523,62 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
             if (paintedShadowStrength() >= 1.0f) {
                 return result;
             }
-            std::vector<char> text;
-            if (FILE* file = fopen("hd\\painted_shadows.json", "rb")) {
-                char buffer[65536];
-                size_t n;
-                while ((n = fread(buffer, 1, sizeof(buffer), file)) > 0) {
-                    text.insert(text.end(), buffer, buffer + n);
-                }
-                fclose(file);
+            std::vector<std::string> files;
+            bool gameHd = false;
+            for (const std::string& root : hdArtDirs(&gGameConfig)) {
+                files.push_back(root + "\\painted_shadows.json");
+                gameHd = gameHd || compat_stricmp(root.c_str(), "hd") == 0;
             }
-            JsonValue root;
-            std::string error;
-            if (text.empty() || !jsonParse(text.data(), text.size(), root, &error)) {
-                debugPrint("HD: painted shadows: no hd\\painted_shadows.json%s%s; painted shadows stay as they are\n", error.empty() ? "" : ", ", error.c_str());
-                return result;
+            if (!gameHd) {
+                files.push_back("hd\\painted_shadows.json");
             }
             size_t frames = 0;
-            for (const auto& sprite : root["sprites"].members) {
-                std::vector<PaintedShadowMask>& masks = result[sprite.first];
-                for (const JsonValue& entry : sprite.second.items) {
-                    PaintedShadowMask mask = { entry["rotation"].asInt(), entry["frame"].asInt(), entry["width"].asInt(), entry["height"].asInt(), {} };
-                    for (const JsonValue& value : entry["runs"].items) {
-                        mask.runs.push_back(value.asInt());
+            std::string read;
+            std::string problems;
+            for (const std::string& path : files) {
+                std::vector<char> text;
+                if (FILE* file = fopen(path.c_str(), "rb")) {
+                    char buffer[65536];
+                    size_t n;
+                    while ((n = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+                        text.insert(text.end(), buffer, buffer + n);
                     }
-                    masks.push_back(std::move(mask));
-                    frames++;
+                    fclose(file);
+                }
+                if (text.empty()) {
+                    continue;
+                }
+                JsonValue root;
+                std::string error;
+                if (!jsonParse(text.data(), text.size(), root, &error)) {
+                    problems += ", " + path + ": " + error;
+                    continue;
+                }
+                read += (read.empty() ? "" : " + ") + path;
+                for (const auto& sprite : root["sprites"].members) {
+                    if (result.count(sprite.first) != 0) {
+                        continue; // an earlier folder's art
+                    }
+                    std::vector<PaintedShadowMask>& masks = result[sprite.first];
+                    for (const JsonValue& entry : sprite.second.items) {
+                        PaintedShadowMask mask = { entry["rotation"].asInt(), entry["frame"].asInt(), entry["width"].asInt(), entry["height"].asInt(), {} };
+                        for (const JsonValue& value : entry["runs"].items) {
+                            mask.runs.push_back(value.asInt());
+                        }
+                        masks.push_back(std::move(mask));
+                        frames++;
+                    }
                 }
             }
-            debugPrint("HD: painted shadows: %d sprites, %d frames, drawn %.2f strong\n", static_cast<int>(result.size()), static_cast<int>(frames), paintedShadowStrength());
+            if (read.empty()) {
+                debugPrint("HD: painted shadows: no %s%s; painted shadows stay as they are\n", files.front().c_str(), problems.c_str());
+                return result;
+            }
+            debugPrint("HD: painted shadows: %d sprites, %d frames, drawn %.2f strong%s%s%s\n", static_cast<int>(result.size()), static_cast<int>(frames), paintedShadowStrength(),
+                files.size() > 1 ? " (" : "", files.size() > 1 ? read.c_str() : "", files.size() > 1 ? ")" : "");
+            if (!problems.empty()) {
+                debugPrint("HD: painted shadows: skipped%s\n", problems.c_str() + 1);
+            }
             return result;
         }();
         return table;

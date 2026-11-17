@@ -421,6 +421,8 @@ opencode.json
 /hd.local.ini
 /hd.release.ini
 /hd.release-*.ini
+/hd.fo1.ini
+/hd.fo1-*.ini
 /hd.local.manifest.json
 
 # Game data formats

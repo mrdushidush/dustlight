@@ -19,7 +19,7 @@ namespace fallout::hd {
 //   renderer=d3d11            Direct3D 11 presentation (default; sdl = CE's own), hd/d3d11_presenter.h
 //   map_gpu=1                 the map drawn on the GPU (default 1; d3d11 only), hd/map_layer.h
 //   hd_art=1                  HD art in the GPU map (default 1), hd/hd_art.h
-//   hd_art_dir=<data_root>\hdpack   HD art packs (default "hd")
+//   hd_art_dir=<data_root>\hdpack   HD art packs (default "hd"; "a|b": folders searched in order)
 //   vram_budget_mb=512        GPU memory for HD art
 //   ui_hd=1                   HD art in CE's own screens (default 1, hd/ui_layer.h)
 //   edge_fill=0               tiling HD art (floors, roofs, walls) keeps the 1x mask's saw-tooth edge

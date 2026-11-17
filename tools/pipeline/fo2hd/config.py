@@ -29,15 +29,25 @@ class Paths:
         return self.data_root / "reports"
 
 
-def load_paths(ini: Path | None = None) -> Paths:
-    # FO2HD_INI: another machine-paths file (PLAN.md R6, the release's clean-install copy).
+def ini_path(ini: Path | None = None) -> Path:
+    # FO2HD_INI: another machine-paths file (PLAN.md R6, the release's clean-install copy;
+    # P8, hd.fo1.ini for Fallout 1 through Et Tu). A relative path is the repo's.
     env = os.environ.get("FO2HD_INI")
-    ini = ini or (Path(env) if env else REPO_ROOT / "hd.local.ini")
+    ini = Path(ini) if ini else (Path(env) if env else REPO_ROOT / "hd.local.ini")
+    return ini if ini.is_absolute() else REPO_ROOT / ini
+
+
+def read_ini(ini: Path | None = None) -> configparser.ConfigParser:
+    ini = ini_path(ini)
     if not ini.exists():
         raise SystemExit(f"Missing {ini}. Copy hd.local.ini.example to hd.local.ini and set the paths.")
     parser = configparser.ConfigParser(inline_comment_prefixes=(";", "#"))
     parser.read(ini, encoding="utf-8")
-    section = parser["paths"]
+    return parser
+
+
+def load_paths(ini: Path | None = None) -> Paths:
+    section = read_ini(ini)["paths"]
     return Paths(
         pristine=Path(section["pristine"]),
         working_copy=Path(section["working_copy"]),

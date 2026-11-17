@@ -182,6 +182,10 @@ $benchViews = @(
     [pscustomobject]@{ name = 'bench-combat-arcaves-orig'; map = 'arcaves.map'; elevation = 0; tile = -1
         extra = $playArgs + @("`"[hd_debug]inject_keys=$($combatKeys -join ',')`"", '"[hd]map_gpu=0"', '"[hd]ui_hd=0"') }
 )
+# P8: a tour of another game's maps (Fallout Et Tu) has none of these Fallout 2 maps: skip their views.
+$tourMaps = @($views | ForEach-Object { $_.map })
+$cycleViews = @($cycleViews | Where-Object { $tourMaps -contains $_.map })
+$benchViews = @($benchViews | Where-Object { $tourMaps -contains $_.map })
 $views = @($evictViews) + @($cycleViews) + @($benchViews) + @($views)
 $exe = Join-Path $work 'fallout2-ce.exe'
 
@@ -211,6 +215,10 @@ function Invoke-View($v, [int]$f8Ms) {
     # unit of work), and the old mode comes back afterwards.
     $bench = $v.name -like 'bench-*'
     if ($bench) { $oldMode = Set-BatchMode 'pause'; Start-Sleep -Seconds 20 }
+    # P8.2's name lists (hd_art.cc writeNameList, at a clean exit): art without packs and packs
+    # whose frames didn't match. Last view's go first, so a killed game leaves none behind.
+    $nameLists = @('hd_art_missing.txt', 'hd_art_mismatch.txt')
+    foreach ($list in $nameLists) { Remove-Item (Join-Path $work $list) -ErrorAction SilentlyContinue }
     try {
         $env:DEBUGACTIVE = 'log'
         $started = Get-Date
@@ -234,6 +242,10 @@ function Invoke-View($v, [int]$f8Ms) {
 
     $viewLog = Join-Path $runDir "$($v.name).debug.log"
     Copy-Item (Join-Path $work 'debug.log') $viewLog -Force
+    foreach ($list in $nameLists) {
+        $from = Join-Path $work $list
+        if (Test-Path $from) { Copy-Item $from (Join-Path $runDir "$($v.name).$($list -replace '^hd_art_', '')") -Force }
+    }
     $lines = @(Get-Content $viewLog | Where-Object { $_ -match 'HD: ' })
     $tests = @($lines | Where-Object { $_ -match "self-test '[^']+'( \dx| mask| hd)?: (PASS|FAIL)" -and $_ -notmatch 'present self-test' })
     $fails = @($tests | Where-Object { $_ -match ': FAIL' })
@@ -275,7 +287,7 @@ function Invoke-View($v, [int]$f8Ms) {
             $stills[$s[1]] = "$($v.name)-$($s[1]).png"
         }
     }
-    $failImages = @(Get-ChildItem $failDir -Filter '*.png' -ErrorAction SilentlyContinue | Select-Object -First 4 | ForEach-Object {
+    $failImages = @(Get-ChildItem $failDir -Filter '*.png' -ErrorAction SilentlyContinue | Select-Object -First 8 | ForEach-Object {
         $dst = "$($v.name)-fail-$($_.Name)"; Copy-Item $_.FullName (Join-Path $runDir $dst) -Force; $dst })
     $missing = $lines | Where-Object { $_ -match 'art without packs: (.*)$' } | Select-Object -Last 1
     # P7a.3: the names behind that count (the game writes them at exit; an older file is stale).
@@ -309,7 +321,8 @@ function Invoke-View($v, [int]$f8Ms) {
 # A game the tour didn't start is the author's: he may lock the PC with his game still open, and
 # a second game on the same working copy would share its config, logs and saves.
 function Get-OwnGames { @(Get-CimInstance Win32_Process -Filter "Name='fallout2-ce.exe'" | Where-Object { $_.ParentProcessId -eq $PID }) }
-function Test-ForeignGame { [bool](Get-CimInstance Win32_Process -Filter "Name='fallout2-ce.exe'" | Where-Object { $_.ParentProcessId -ne $PID }) }
+# the author's games also run as dustlight*.exe (release zips, his Fallout 1 launcher's dustlight-fo1.exe).
+function Test-ForeignGame { [bool](Get-CimInstance Win32_Process -Filter "Name='fallout2-ce.exe' OR Name LIKE 'dustlight%'" | Where-Object { $_.ParentProcessId -ne $PID }) }
 
 function Wait-Locked {
     if (-not (Test-Locked) -or (Test-ForeignGame)) {

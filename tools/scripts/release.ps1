@@ -6,6 +6,11 @@
 #   release.ps1 ... -Tiers 2 -SkipBuild      one tier, the exe as last built
 #   release.ps1 ... -DocsOnly                only the filled docs, in <release data root>\reports\player-docs
 #   release.ps1 ... -Tiers none -Field 'size_2x=about 1.5 GB',...   engine-only update (art of an earlier release)
+#   release.ps1 -Game fo1 -Credits docs\player\art_credits_release.json   Fallout 1's art zips only (P8.7):
+#       <name>-<version>-art-fo1-<N>x.zip, unpacking into hd-fo1\ next to Fallout 2's hd\ in Et Tu's
+#       Fallout1in2 folder (the engine then reads "hd-fo1|hd"); art from <fo1 data root>\hdpack-fo1 (hd.fo1.ini)
+#       with its painted_shadows.json; nothing shipped may equal a file of Et Tu's folder (its mods, Fallout 1's
+#       art in them, and Fallout 2's master.dat and critter.dat it reads). -> <fo1 data root>\dist\<Version>\
 #
 # Output: <release data root>\dist\<Version>\ (zips, nexus.md, SHA256SUMS.txt, release.json) and
 # the exe's pdb in <release data root>\symbols\<Version>\ for crash reports (never shipped).
@@ -23,13 +28,14 @@ param(
     [switch]$DocsOnly,
     # More {key} values for the docs, e.g. an engine-only update (-Tiers none) states the
     # earlier release's pack sizes: -Field 'size_2x=about 1.5 GB','size_3x=about 3.2 GB'
-    [string[]]$Field = @()
+    [string[]]$Field = @(),
+    [ValidateSet('fo2', 'fo1')][string]$Game = 'fo2'
 )
 
 . (Join-Path $PSScriptRoot 'common.ps1')
 Update-ProcessPath
 
-$env:FO2HD_INI = Join-Path $script:RepoRoot 'hd.release.ini'
+$env:FO2HD_INI = Join-Path $script:RepoRoot $(if ($Game -eq 'fo1') { 'hd.fo1.ini' } else { 'hd.release.ini' })
 $info = Get-Content -Raw (Join-Path $script:RepoRoot 'src\hd\release_info.h')
 if ($Name -eq '') { $Name = [regex]::Match($info, '#define HD_RELEASE_NAME "([^"]+)"').Groups[1].Value }
 if ($Version -eq '') { $Version = [regex]::Match($info, '#define HD_RELEASE_VERSION "([^"]+)"').Groups[1].Value }
@@ -40,12 +46,30 @@ if ($numbers -ne "$($fromText.Groups[1].Value),$($fromText.Groups[2].Value),$($f
     throw "HD_RELEASE_VERSION_NUMBERS ($numbers) doesn't match $Version (src/hd/release_info.h)."
 }
 $data = (Get-HdPaths)['data_root'].TrimEnd('\')
-if ($HdPack -eq '') { $HdPack = Join-Path $data 'hdpack' }
+if ($HdPack -eq '') { $HdPack = Join-Path $data $(if ($Game -eq 'fo1') { 'hdpack-fo1' } else { 'hdpack' }) }
 if (-not (Test-Path (Join-Path $HdPack 'art'))) { throw "No art in $HdPack." }
 if ($ExeName -eq '') { $ExeName = "$($Name.ToLower()).exe" }
 $Credits = (Resolve-Path $Credits).Path
 $out = if ($DocsOnly) { Join-Path $data 'reports\player-docs' } else { Join-Path $data "dist\$Version" }
 if ((Test-Path $out) -and -not $DocsOnly) { throw "$out exists; a version is built once (bump -Version)." }
+
+if ($Game -eq 'fo1') {
+    # Fallout 1's art only: the engine zip (and its docs, painted shadows, pdb) come from the Fallout 2 release of
+    # the same version. The content audit hashes Et Tu's folder (working_copy in hd.fo1.ini; read only).
+    if ($DocsOnly) { throw '-DocsOnly: the docs belong to the engine zip (release.ps1 without -Game fo1).' }
+    $shadows = Join-Path $HdPack 'painted_shadows.json'
+    if (-not (Test-Path $shadows)) { throw "No $shadows (tools/scripts/painted_shadows.py --list painted_shadows_fo1.txt)." }
+    $etTu = (Get-HdPaths)['working_copy'].TrimEnd('\')
+    Push-Location (Join-Path $script:RepoRoot 'tools\pipeline')
+    try {
+        Invoke-Native { & uv run fo2hd release --art-only --art-prefix hd-fo1 --art-label art-fo1 --name $Name --version $Version `
+            --hdpack $HdPack --out $out --tiers $Tiers --art-credits $Credits --art-file "$shadows=painted_shadows.json" --pristine $etTu } |
+            Where-Object { $_ -notmatch 'meshgrid|UserWarning' } | ForEach-Object { Write-Host $_ }
+        if ($LASTEXITCODE -ne 0) { throw "fo2hd release failed ($LASTEXITCODE)" }
+    } finally { Pop-Location }
+    Write-Step "Fallout 1 art $Name $Version -> $out"
+    return
+}
 
 if (-not $SkipBuild -and -not $DocsOnly) {
     & (Join-Path $PSScriptRoot 'build.ps1')

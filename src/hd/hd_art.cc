@@ -23,6 +23,7 @@
 #include "debug.h"
 #include "game_config.h"
 #include "hd/d3d11_shared.h"
+#include "hd/first_run.h"
 #include "hd/json_reader.h"
 #include "hd/map_renderer.h"
 #include "imgui.h"
@@ -79,7 +80,9 @@ namespace {
     };
 
     struct Pack {
-        std::string dir;
+        std::string key; // "art\<type>\<name>" (packKey), the same in every art folder
+        std::string dir; // the folder it loaded from + key, once loaded (main thread)
+        int root = -1; // that folder's index in State::roots
         PackState state = PackState::Loading;
         bool forcedMissing = false;
         bool loggedMismatch = false;
@@ -148,6 +151,8 @@ namespace {
         int tier;
         PackState state;
         PackData data;
+        std::string dir;
+        int root = -1;
     };
 
     struct State {
@@ -156,14 +161,14 @@ namespace {
         bool forceOriginal = false;
         int fallbackPercent = 0;
         int debugTileSpan = 0; // [hd_debug] hd_tile_span, 0 = off
-        std::string root;
+        std::vector<std::string> roots; // [hd] hd_art_dir, searched in order (fixed while the loader runs)
         int budgetMb = 1024;
 
         ComPtr<ID3D11Texture2D> pool;
         ComPtr<ID3D11ShaderResourceView> poolView;
         std::vector<Page> pages;
 
-        std::unordered_map<std::string, std::unique_ptr<Pack>> packs; // by dir
+        std::unordered_map<std::string, std::unique_ptr<Pack>> packs; // by key
         std::unordered_map<int, Pack*> byFid;
         std::unordered_map<std::string, Pack*> byPath; // named art
 
@@ -316,8 +321,19 @@ namespace {
             Result result = { request.pack, request.tier, PackState::Failed, {} };
             std::vector<unsigned char> json;
             std::string error;
-            const std::string& dir = request.pack->dir;
-            if (!readFile(dir + "\\pack.json", json)) {
+            // The first art folder that has the pack (P8.2: Fallout 1's own
+            // art before Fallout 2's); the key never changes after creation.
+            std::string dir;
+            for (size_t i = 0; i < gState->roots.size(); i++) {
+                std::string candidate = gState->roots[i] + "\\" + request.pack->key;
+                if (readFile(candidate + "\\pack.json", json)) {
+                    dir = candidate;
+                    result.root = static_cast<int>(i);
+                    break;
+                }
+            }
+            result.dir = dir;
+            if (dir.empty()) {
                 result.state = PackState::Missing;
             } else if (!parsePack(json, result.data, error)) {
                 debugPrint("HD: art pack %s: %s\n", dir.c_str(), error.c_str());
@@ -385,15 +401,14 @@ namespace {
         std::string key;
         Pack* pack = nullptr;
         if (packKey(path, key)) {
-            std::string dir = gState->root + "\\" + key;
-            auto found = gState->packs.find(dir);
+            auto found = gState->packs.find(key);
             if (found == gState->packs.end()) {
                 auto fresh = std::make_unique<Pack>();
-                fresh->dir = dir;
+                fresh->key = key;
                 fresh->forcedMissing = gState->forceOriginal
                     || (gState->fallbackPercent > 0 && static_cast<int>(pathHash(key) % 100) < gState->fallbackPercent);
                 pack = fresh.get();
-                gState->packs.emplace(dir, std::move(fresh));
+                gState->packs.emplace(key, std::move(fresh));
                 if (pack->forcedMissing) {
                     pack->state = PackState::Missing;
                 } else {
@@ -428,24 +443,28 @@ namespace {
         return pack;
     }
 
-    // Names of the FRMs drawn this session that have no pack (art not built
-    // yet, or not meant to be: P7). Too long for debug.log (debugPrint cuts
-    // long lines), so the names go to hd_art_missing.txt in the game folder
-    // and the log gets a count per art folder.
-    void writeMissingList()
+    // Names of the FRMs drawn this session that have no pack in any art
+    // folder (art not built yet, or not meant to be: P7), and (P8.2) of the
+    // packs whose frames didn't match the art the game draws (a mod changed
+    // the art under the same name: Fallout 1's art under Fallout 2's names).
+    // Too long for debug.log (debugPrint cuts long lines), so the names go to
+    // hd_art_missing.txt and hd_art_mismatch.txt in the game folder and the
+    // log gets a count per art folder.
+    void writeNameList(const char* fileName, const char* what, bool mismatched)
     {
         std::vector<std::string> names;
         for (const auto& entry : gState->packs) {
             const Pack& pack = *entry.second;
-            if (pack.state == PackState::Missing && !pack.forcedMissing) {
-                names.push_back(pack.dir.substr(std::min(pack.dir.size(), gState->root.size() + 1)));
+            if (mismatched ? pack.loggedMismatch : pack.state == PackState::Missing && !pack.forcedMissing) {
+                names.push_back(pack.key);
             }
         }
         if (names.empty()) {
+            remove(fileName); // not last session's names
             return;
         }
         std::sort(names.begin(), names.end());
-        FILE* stream = fopen("hd_art_missing.txt", "wt");
+        FILE* stream = fopen(fileName, "wt");
         if (stream != nullptr) {
             for (const std::string& name : names) {
                 fprintf(stream, "%s\n", name.c_str());
@@ -466,7 +485,26 @@ namespace {
             perFolder += part;
             i = j;
         }
-        debugPrint("HD: art without packs: %d (%s); names in hd_art_missing.txt\n", static_cast<int>(names.size()), perFolder.c_str());
+        debugPrint("HD: %s: %d (%s); names in %s\n", what, static_cast<int>(names.size()), perFolder.c_str(), fileName);
+    }
+
+    // P8.2: one line per art folder, how many of the packs drawn this
+    // session came from it.
+    void logFolderUse()
+    {
+        if (gState->roots.size() < 2) {
+            return;
+        }
+        std::vector<int> loaded(gState->roots.size(), 0);
+        for (const auto& entry : gState->packs) {
+            const Pack& pack = *entry.second;
+            if (pack.root >= 0 && pack.root < static_cast<int>(loaded.size())) {
+                loaded[pack.root]++;
+            }
+        }
+        for (size_t i = 0; i < gState->roots.size(); i++) {
+            debugPrint("HD: art folder %d (%s): %d packs found here\n", static_cast<int>(i) + 1, gState->roots[i].c_str(), loaded[i]);
+        }
     }
 
     void countPacks()
@@ -779,6 +817,8 @@ namespace {
             }
             pack->state = result.state;
             pack->data = std::move(result.data);
+            pack->dir = std::move(result.dir);
+            pack->root = result.root;
             pack->resident.clear();
             gState->uiArrived = true;
             if (pack->state == PackState::Loaded && gState->mapStamp != 0 && pack->mapUse == gState->mapStamp) {
@@ -799,12 +839,7 @@ bool hdArtInit()
     }
 
     gState = new State();
-    char* dir = nullptr;
-    configGetString(&gGameConfig, "hd", "hd_art_dir", &dir, "hd");
-    gState->root = dir != nullptr ? dir : "hd";
-    while (!gState->root.empty() && (gState->root.back() == '\\' || gState->root.back() == '/')) {
-        gState->root.pop_back();
-    }
+    gState->roots = hdArtDirs(&gGameConfig);
     configGetInt(&gGameConfig, "hd", "vram_budget_mb", &gState->budgetMb, 1024);
     int force = 0;
     configGetInt(&gGameConfig, "hd_debug", "hd_force_original", &force, 0);
@@ -822,8 +857,27 @@ bool hdArtInit()
     }
     gState->loader = std::thread(loaderMain);
     gState->configured = true;
-    debugPrint("HD: art store up: %s, pool %d pages (%lld MB)%s%s\n", gState->root.c_str(), gState->stats.pages, gState->stats.poolBytes >> 20,
+    std::string roots;
+    for (const std::string& root : gState->roots) {
+        roots += (roots.empty() ? "" : " | ") + root;
+    }
+    debugPrint("HD: art store up: %s, pool %d pages (%lld MB)%s%s\n", roots.c_str(), gState->stats.pages, gState->stats.poolBytes >> 20,
         gState->forceOriginal ? ", original art forced" : "", gState->fallbackPercent > 0 ? ", some art forced to fall back" : "");
+    if (gState->roots.size() > 1) {
+        for (size_t i = 0; i < gState->roots.size(); i++) {
+            int tiers = 0;
+            for (int tier = 2; tier <= 4; tier++) {
+                char marker[32];
+                snprintf(marker, sizeof(marker), "\\pack_%dx.json", tier);
+                if (FILE* f = fopen((gState->roots[i] + marker).c_str(), "rb")) {
+                    fclose(f);
+                    tiers |= 1 << tier;
+                }
+            }
+            debugPrint("HD: art folder %d of %d: %s (tier markers:%s%s%s%s)\n", static_cast<int>(i) + 1, static_cast<int>(gState->roots.size()), gState->roots[i].c_str(),
+                (tiers & 4) != 0 ? " 2x" : "", (tiers & 8) != 0 ? " 3x" : "", (tiers & 16) != 0 ? " 4x" : "", tiers == 0 ? " none" : "");
+        }
+    }
     if (gState->debugTileSpan > 0) {
         debugPrint("HD: art store: frames over %d px are drawn in tiles ([hd_debug] hd_tile_span)\n", gState->debugTileSpan);
     }
@@ -846,7 +900,9 @@ void hdArtShutdown()
     const HdArtStats& s = gState->stats;
     debugPrint("HD: art store stats: %d packs (%d loaded, %d missing, %d failed), %lld uploads, %lld evictions, %lld over budget, %d mismatches\n",
         s.packsKnown, s.packsLoaded, s.packsMissing, s.packsFailed, s.uploadsTotal, s.evictionsTotal, s.overBudgetTotal, s.mismatches);
-    writeMissingList();
+    writeNameList("hd_art_missing.txt", "art without packs", false);
+    writeNameList("hd_art_mismatch.txt", "art packs that don't match the game's art", true);
+    logFolderUse();
     debugPrint("HD: VRAM: process peak %llu MB (OS budget %llu MB); pool %lld MB with %d of %d pages used, map targets+atlas %lld MB\n",
         s.vramPeak >> 20, s.vramOsBudget >> 20, s.poolBytes >> 20, s.pagesUsed, s.pages, mapRendererGpuBytes() >> 20);
     delete gState;

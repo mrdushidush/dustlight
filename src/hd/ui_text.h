@@ -9,7 +9,8 @@ namespace fallout::hd {
 
 // HD glyphs for the HD UI's text (P7b.5): the atlases `fo2hd fonts` builds
 // from the game's interface fonts, <hd_art_dir>/fonts/fonts.json and
-// font<N>-<style>-<tier>x.png (8-bit glyph coverage).
+// font<N>-<style>-<tier>x.png (8-bit glyph coverage); with several art
+// folders, the first that has fonts/fonts.json.
 //
 //   [hd] ui_text=1            HD text in the HD UI (default 1)
 //   [hd] ui_text_style=model  model (the art upscaler's glyphs, the author's

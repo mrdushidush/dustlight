@@ -70,7 +70,7 @@ These additions conflict with nothing in brief §2: both are presentation-only (
 - **Why:** active (daily merges), strictly a superset of upstream, more bug fixes and sfall compatibility, Epic acknowledged.
 - **Cost:** high churn — e.g. the ongoing "typesafe enum" refactors touch the same files we hook (`tile.cc`, `object.cc`, `window_manager.cc`). Mitigation: thin hooks (§8), pin `ebb9c716` for Phase 0, merge `upstream/main` **monthly** with merge commits (no rebase), and keep the list of hooked files short.
 - Other forks surveyed: platform ports (Vita, Switch, 3DS, Miyoo), a co-op experiment, a Godot remake attempt, `fallout2-rt-test` (a stale upstream mirror despite the name). None is a better base.
-- No `fallout1-ce` counterpart exists in the org; Phase 8 will use `alexbatalov/fallout1-ce` (last push 2025-01) or whatever fork is alive then.
+- No `fallout1-ce` counterpart exists in the org; Phase 8 will use `alexbatalov/fallout1-ce` (last push 2025-01) or whatever fork is alive then. **Changed 2026-11-14:** Phase 8 runs Fallout 1 through the Fallout Et Tu mod on this same engine instead (§6.1, "Phase 8 tasks"); fallout1-ce stays the fallback.
 
 ### 3.2 GPU API → Direct3D 11
 
@@ -252,7 +252,7 @@ Exit criteria (brief §7): side-by-side stills, original vs HD-lit, for the thre
 | 5 | **Lighting** | Direct + ambient (original-equivalent first), light colors, shadows, radiance-cascade GI (compute), quality tiers, per-category strengths | Day/night, caves, Den at night approved by the author; every feature toggles; 60 fps at 3440×1440 all-on (dev; added 2026-10-31, the author's native resolution), 60 fps at 1080p GI-off (laptop; on hold since 2026-10-31, laptop out of scope) |
 | 6 | **Effects** | Palette-cycle shaders on HD assets via cycle masks; emissives → bloom; AgX tone map, grain, vignette, grading; fades on the HD layer | Water, fire, monitors and alarms animate correctly; bloom on emissives; each effect toggles |
 | 7 | **Full asset pass + UI pass** | Whole-game batch; automated capture tour of every map with diff reports; HD versions of the remaining UI (interface bar, dialogue, PipBoy, character screen, world map) built on the I-track UI layer | Whole game playable start to finish; no visual regressions in the capture tour |
-| 8 | **Fallout 1** | Port `src/hd` + pipeline config to fallout1-ce | Same renderer and pipeline running Fallout 1 (needs the author's F1 copy) |
+| 8 | **Fallout 1** (through Fallout Et Tu; changed 2026-11-14, was a port of `src/hd` to fallout1-ce) | The Dustlight program runs Et Tu (Fallout 1 inside the Fallout 2 engine); a second art folder ahead of Fallout 2's; HD art for Et Tu's own art (F1 creatures, heads, interface, a few map pieces); a Fallout 1 tour; a release kit | Fallout 1 playable start to finish in HD; F1 tour 0 failed checks; the author accepts |
 
 **Phase 3 tasks** (broken down 2026-10-31 at the start of P3, after reading the draw code again):
 
@@ -326,6 +326,33 @@ Provisional calls (the author can overrule): outlines stay 1× (drawn by the exa
 | P7b.4 Coverage fixes | From the walk's numbers: copies between windows carry their HD content, scratch-buffer composition (if a screen needs it), walk entries for dialogue, barter and the world map | Each listed screen mostly HD; the rest reported |
 | P7b.5 HD text | Text writes recorded (font, string, color, position); glyphs built offline from the game's fonts at N×; 1× check against CE's own glyphs | Text crisp at 3×; fallback where the check fails |
 | P7b.6 Tests + report | `ui_test.ps1` (locked PC only): per screen HD vs original stills, coverage, self-tests, frame time; a second tour (P7a.5) | the author reviews |
+
+**Phase 8 tasks** (planned 2026-11-14; the author: "Build the whole plan", building starts next session). **Route:** Fallout 1 runs as **Fallout Et Tu** (`rotators/Fo1in2`, Fallout 1 inside the Fallout 2 engine) on the Dustlight program, not as a port of `src/hd` to fallout1-ce. Et Tu v2.0.3911 (2026-10-14) runs natively on fallout2-ce, our upstream; our merge base `ebb9c716` (2026-10-30) is newer. The player owns both games: Et Tu's `undat` takes Fallout 1's art from the player's own `MASTER.DAT`. Fallout Yesterday (Van Buren in the Fallout 2 engine) was compared and left for later: it needs the original 1998 exe with sfall and the hi-res patch, CE lists it as "not tested", and it is 6.6 GB; P8.1's tools give it a quick yes/no afterwards.
+
+**Spike (2026-11-14, a test copy of Et Tu):** Et Tu + Fallout 1 English data + Dustlight 0.9.3 (`dustlight.exe` A82EA5D3 and its `ce.dat`; Et Tu's own `ce.dat` differs only in the `ce.msg` texts), art from `[hd] hd_art_dir=<release data root>\hdpack-ship-092`, launcher `Play-EtTu-Dustlight.bat`. The author played two runs: "game runs great", "definitely HD now - and looking neat!". Run 2's log: 888 packs loaded, 0 failed, about 60 fps at 3440×1440 (Vault 15, Junktown). Findings:
+- **Art** (every frame's pixels against Fallout 2's packed art, in CE's load order; `<fo1 data root>\spike-2026-11-14\ettu_coverage.py` with its results, run 2's fallback list and both script scans; P8.1 turns it into a tool): already HD 781 Mpx (14,487 files: nearly all floors, walls and scenery). To build 576 Mpx, 72% of Fallout 2's 802 Mpx: critters 420 (47 Fallout 1 creature and armor sets from Et Tu's `fo1_base`), heads 128, interface 22, map art about 5, items and inventory under 1. 719 files keep a Fallout 2 name with other pixels (run 2 fell back on 116 of them: walls 58, tiles 29, interface 21, scenery 8); the hash check shows the original art there, never wrong HD art.
+- **Palette:** Et Tu's `color.pal` is byte-identical to Fallout 2's, so the packs, light and effects carry over.
+- **Scripts** (`--scan-unimplemented`, 1,063 scripts): the mods Et Tu loads by default lack only three sfall hooks, `HOOK_SETLIGHTING` (the light of a flare the player holds), `HOOK_CARTRAVEL` (the motorcycle running out of fuel on the world map) and `HOOK_SETGLOBALVAR`, plus raw memory writes into the 1998 exe (no effect on CE). These are the same gaps the stock CE exe that Et Tu ships has. The other findings are in mods that are off by default.
+- **First start** picks the pack tier from the screen (scale 3 at 1440 px). An art folder without that tier shows no HD art at all (run 1, which used the 4x-only test copy).
+- `hd_art_missing.txt` listed only 7 interface names, although Fallout 1's creatures have no packs: map art seems not to be recorded (P8.2).
+- Et Tu's repo declares no license. Nothing of Et Tu or either game is shipped; asking its team before publishing is one of the author's outward steps (P8.8).
+
+**Ground rules:** as the release track (§6.3a): free, no original or Et Tu file shipped, every outward step the author's. The look is Fallout 2's shipped look: characters edge X16 from the original pixels with painted shadows, no AI; heads, interface and items from UltraSharpV2 (Kim2091's permission); floors, roofs, walls and scenery mixed by `art_mix.py` with j6's flags. No new look rounds unless the checks show Fallout 1's art behaving differently.
+
+| Task | Work | Accept |
+|---|---|---|
+| P8.0 Working copy + config | `hd.fo1.ini`: `pristine` = Fallout 2 English (Et Tu reads `..\master.dat`, `..\critter.dat`), `working_copy` = `<games>\fo1in2-test\Fallout1in2`, `data_root` = `<fo1 data root>` (own root, so Fallout 2's masters, reports and tours stay untouched). The spike's backups (`ce.dat.ettu`, `Fallout2.cfg.ettu-orig`) and logs (`debug-run1-no3x.log`, `scan_unimplemented-run1.txt`) stay. The Fallout 1 install is read only | Scripts run with `$env:FO2HD_INI` pointing at it; nothing writes into either game install |
+| P8.1 Pipeline reads Et Tu | `fo2hd/dat.py` `GameFiles`: sfall mods from `mods\mods_order.txt` (folders and .dat; later lines win; `;` lines are off) between the patch folders and `patchNNN.dat`, as CE's `sfallLoadMods`; `master_dat`/`critter_dat` relative to the game folder (`..\`); no `sfall.dat` (CE doesn't load it). New `fo2hd art-diff --base <ini>`: every FRM the game sees, by file and by frame (pixel hash), against the base game's packed art: `same`, `twin` (same pixels under another name: copy the pack, nothing to build), `changed`, `new`; writes the build manifest | `dat-list` agrees with what the game opens (spot checks in the log); `art-diff` reproduces the spike's numbers (576 Mpx to build) |
+| P8.2 Engine: two art folders | `[hd] hd_art_dir` takes a `|` list (`;` starts an INI comment in CE's config reader), searched in order per pack (`hd-fo1|hd` for Et Tu); first-start tier detection, fonts and `painted_shadows.json` per folder (the first folder wins per sprite; today the json path is fixed at `hd\painted_shadows.json`); `hd_art_missing.txt` records map art too; one log line per folder. All in `src/hd` | Fallout 2 with one folder: tour subset stills pixel-identical to 0.9.3, 0 failed checks. Et Tu with two folders: run 2's 116 fallbacks show Fallout 1's HD art once it is built |
+| P8.3 Missing hooks (optional; **skipped for now**, the author 2026-11-15: play as stock CE does, revisit if P8.6 shows a need; upstream main still lists all three as unimplemented) | First check upstream fallout2-ce (the hooks may land after our merge base). Otherwise `HOOK_SETLIGHTING`, `HOOK_CARTRAVEL`, `HOOK_SETGLOBALVAR` in `sfall_script_hooks.cc` as sfall documents them, offered upstream (outward: The author) | The scan shows no gap in the default mods; a held flare lights the player; the motorcycle out of fuel behaves as under sfall |
+| P8.4 Fallout 1 art | From P8.1's manifest. Critters (about 4,450 FRMs, 420 Mpx): edge X16 + painted shadows, no AI (`art_x16.py`, CPU). Heads, interface, inventory, items, skilldex (about 150 Mpx): UltraSharpV2 masters as shipped (GPU about 3 h at P1's rate; adaptive, or locked at night). Floors, roofs, walls, scenery (about 5 Mpx): masters + `art_mix.py` with j6's flags; floor and roof roles from Et Tu's maps (`fo2hd maps`); joins scored on Fallout 1's maps (`look_joins.py`). Painted-shadow masks for the new art (`painted_shadows.py`). Fonts only if Et Tu changes them. `twin` packs copied. Packs 2×/3×/4× with the BC7 round trip → `<fo1 root>\hdpack-ship-fo1` | Every FRM Fallout 1's maps and screens draw has a pack in one of the two folders; BC7 round trip passes |
+| P8.5 Fallout 1 tour + patrol | `fo2hd maps` over Et Tu → `tour.json` (the entrance and the busiest spots of each elevation); `tour.ps1` with the F1 ini (locked PC only, resumable): map self-tests, stills HD vs original; eye patrol (math + champion, tier 1 by eye) | All views 0 failed checks, all HD; defect list reviewed; brightness against the original art reported |
+| P8.6 the author plays | His own new Fallout 1 game in the test folder on the built packs (`Play-EtTu-Dustlight.bat` updated); the missing-art list and logs read after each session | the author's verdict; fixes listed |
+| P8.7 Release kit | Player install: Et Tu as its README says, then Dustlight's engine zip into `Fallout1in2\`, the Fallout 2 art zip and a Fallout 1 art zip (the tier for their screen) into `hd\` and `hd-fo1\` (the author, 2026-11-15: both packs inside Et Tu, self-contained; not pointing at a Fallout 2 install); with `hd_art_dir` not set the engine reads `hd-fo1|hd` when `hd-fo1\pack_<N>x.json` exists (no config edit); README section; `release.ps1 -Game fo1` with the content audit (no Fallout 1, Fallout 2 or Et Tu file inside); clean install test on a fresh Et Tu + the zips, WARP self-test too; public copy of the code | Zips and kit ready; clean install passes |
+| P8.8 Outward steps (the author, each on his OK at that moment) | Ask the Et Tu team; confirm Kim2091's permission covers HD art for Fallout 1 too; a new Nexus page in the Fallout (1) section (decided 2026-11-15, §6.4); VirusTotal, GitHub release, Nexus upload; an NMA note if he wants | — |
+| P8.9 Report | Stills per Fallout 1 town, original vs HD; numbers; provisional calls | **The author accepts P8** |
+
+Estimate: P8.0-P8.2 two to three days; P8.3 one to two days if chosen; P8.4 about a week including the overnight runs; P8.5 three to five days; P8.7 two to three days: about **2-3 weeks** in all.
 
 **HD asset format (finalizes brief §5.6):** keyed by lower-case DAT path, e.g. `art/critters/hmwarrab.frm` → `<data_root>\hd\art\critters\hmwarrab\` containing `albedo`, `normal`, `height`, `emissive`, `cycle` atlases per tier (`.png` while developing, BC7 `.dds` for runtime) and `manifest.json` (scale, per-rotation/per-frame rects, scaled offsets, fps, action frame, source hash, pipeline version). Loader rule as in the brief: HD if present, otherwise GPU-upscaled original.
 
@@ -466,6 +493,10 @@ P0 ─► P1 ─► P2 ─► P3 ─► P4 ─► (I0–I4 ?) ─► P5 ─► P
 
 **After the Phase 7 report (2026-11-03):** the author asked for both fixes for the 12 failed views and the fix for the interface bar beside the dialogue and barter screens; the HD UI stays on until he has tested it; he tests P7 and accepts it soon. Meanwhile the voice track is planned (§6.2, "Voice track tasks"); its start waits for his go.
 
+**Decided by the author (2026-11-14):** Fallout 1 comes next, through Fallout Et Tu (§6.1, "Phase 8 tasks"), after a one-day test he played twice. He asked for the whole plan now and the building from the next session. The voice track (V1 onward) waits.
+
+**Decided by the author (2026-11-15), Nexus for Fallout 1:** its own page in Nexus's Fallout (1) section holding the Fallout 1 art zip and the install guide; the engine and the Fallout 2 art stay on the Fallout 2 Dustlight page (https://www.nexusmods.com/fallout2/mods/193) and are listed as requirements there, so every Fallout 1 player also downloads from it; the Fallout 2 page gets a news post and a line at the top of its description linking the new page. No file is uploaded to both pages. Before any Fallout 1 upload: the Et Tu team and Kim2091 (P8.8).
+
 ---
 
 ## 7. Risk register (extends brief §9)
@@ -493,6 +524,10 @@ P0 ─► P1 ─► P2 ─► P3 ─► P4 ─► (I0–I4 ?) ─► P5 ─► P
 | 19 | Bitmap fonts don't scale | High / Med | SDF or look-alike font in I1 |
 | 20 | Session continuity (work spread over many Claude sessions) | Med / Med | One-session tasks, ADRs, memory notes, scripted regression captures |
 | 21 | Trademark in the project name | Low (private) | Rename before any publication |
+| 22 | Et Tu update changes its art or file order (P8) | Med / Low | The hash check falls back to the original art by itself; `art-diff` lists what to rebuild; the README names the Et Tu version |
+| 23 | Engine gaps under Et Tu: sfall hooks CE lacks (P8) | Certain (3 hooks) / Low | Same as the stock CE exe Et Tu ships; P8.3 optional |
+| 24 | Permissions for Fallout 1 art: Et Tu declares no license; the model permission was given for Fallout 2 (P8) | Med / High for a release | Ship no Et Tu or game file; ask the Et Tu team and Kim2091 before publishing (P8.8). Kim2091: yes for any project on the same terms (2026-11-16); Et Tu team: waiting |
+| 25 | Player install layout: two art folders, tiers, Epic folder names (P8) | Med / Med | First start finds folders and tiers; clean install test (P8.7) |
 
 ---
 
@@ -528,4 +563,4 @@ Later tracks, for reference: Voice → `scripts.cc` (`_scr_get_msg_str_speech`),
 2. **OK to install dev tools:** `uv` (Python env manager), `clang-format` (upstream's formatting check), optionally Ninja (faster builds) and RenderDoc (GPU debugging).
 3. **Phase 0:** a ~10-minute play test (P0.4).
 4. **Phase 1:** pick one upscaler per category from the contact sheets (P1.6), then the go/no-go (P1.10).
-5. **Later:** a Fallout 1 copy for Phase 8.
+5. ~~**Later:** a Fallout 1 copy for Phase 8.~~ Done 2026-11-14 (Epic).

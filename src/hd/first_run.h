@@ -1,9 +1,21 @@
 #ifndef FALLOUT_HD_FIRST_RUN_H_
 #define FALLOUT_HD_FIRST_RUN_H_
 
+#include <string>
+#include <vector>
+
 #include "config.h"
 
 namespace fallout::hd {
+
+// [hd] hd_art_dir: the HD art folders, searched in this order (PLAN.md P8.2).
+// One folder, or several separated by '|' (';' would start an INI comment):
+// Fallout Et Tu runs with "hd-fo1|hd", Fallout 1's own art before Fallout
+// 2's. Each pack, the fonts and each sprite's painted shadow come from the
+// first folder that has them. Default (not set or empty): "hd-fo1|hd" when
+// hd-fo1\pack_<N>x.json exists (the Fallout 1 art zip, P8.7), else "hd";
+// trailing slashes are dropped, empty entries skipped.
+std::vector<std::string> hdArtDirs(Config* config);
 
 // First start of a release install (PLAN.md R3).
 //
@@ -26,6 +38,9 @@ bool firstRunScreenSetup(Config* config);
 const char* firstRunReport();
 
 // Which HD art tiers (2..4) are installed, as a bit mask (bit N = tier N).
+// With several art folders, the tiers every folder that holds art has (a
+// folder without any is left out); if they have none in common, any
+// folder's tiers.
 int installedArtTiers(Config* config);
 
 } // namespace fallout::hd

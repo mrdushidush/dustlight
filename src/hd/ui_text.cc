@@ -16,6 +16,7 @@
 #include "font_manager.h"
 #include "game_config.h"
 #include "hd/d3d11_shared.h"
+#include "hd/first_run.h"
 #include "hd/json_reader.h"
 #include "lodepng.h"
 
@@ -227,13 +228,16 @@ bool uiTextLoad(int scale)
         if (configGetString(&gGameConfig, "hd", "ui_text_style", &style, "model") && style != nullptr && style[0] != '\0') {
             gState->style = style;
         }
-        char* dir = nullptr;
-        configGetString(&gGameConfig, "hd", "hd_art_dir", &dir, "hd");
-        gState->dir = dir != nullptr ? dir : "hd";
-        while (!gState->dir.empty() && (gState->dir.back() == '\\' || gState->dir.back() == '/')) {
-            gState->dir.pop_back();
+        // The first art folder with fonts (P8.2; hdArtDirs), else the first.
+        std::vector<std::string> roots = hdArtDirs(&gGameConfig);
+        gState->dir = roots.front() + "\\fonts";
+        for (const std::string& root : roots) {
+            if (FILE* f = fopen((root + "\\fonts\\fonts.json").c_str(), "rb")) {
+                fclose(f);
+                gState->dir = root + "\\fonts";
+                break;
+            }
         }
-        gState->dir += "\\fonts";
     }
     if (!gState->enabled || scale < 2 || scale > 4) {
         return false;

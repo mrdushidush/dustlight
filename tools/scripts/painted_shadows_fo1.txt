@@ -1,0 +1,36 @@
+# Painted shadows in Fallout 1's art (Fallout Et Tu, Phase 8), as painted_shadows.txt for Fallout 2: per sprite, one
+# pixel (x,y in frame 0, direction 0) inside each candidate patch that is a cast shadow on the ground.
+# python -I painted_shadows.py --game <Et Tu game folder> --list painted_shadows_fo1.txt
+#        --out <fo1 data root>\hdpack-fo1\painted_shadows.json
+# Candidates: Fallout 1's changed and new scenery and walls (art-diff, 254 sprites), Fallout 2's rule (a patch of
+# 100 px or more, trees and cacti 15 px; then every patch of 12 px and up of the sprites kept): 33 sprites, reviewed
+# by eye (Claude, 2026-11-15; sheets <fo1 data root>\shadows\sheets). Kept: the ground shadows of the car wrecks, the
+# motorcycle and the police box, as Fallout 2's car1-5 were kept. Left out: open doors, open trunks and dark gaps in
+# the car bodies, a car's dark roof edge, the undersides of stairs (stair04-06), the Master's vats (vats2-8: dark
+# floor and walls, no cast shadow). None of the 33 is in Fallout 2's list, so no empty entries are needed to keep
+# Fallout 2's masks off Fallout 1's pixels (the engine takes a sprite's masks from the first art folder listing it).
+
+scenery/car100 33,80 133,62 96,71 56,81
+scenery/car101 78,73 33,80 133,62 56,81
+scenery/car102 78,73 33,80 133,62 56,81
+scenery/car103 78,73 33,80 133,62 56,81
+scenery/car104 78,73 33,80 133,62 56,81
+scenery/car110 87,52 34,69
+scenery/car111 87,52 34,69
+scenery/car112 87,52 34,69
+scenery/car113 87,51 34,69
+scenery/car114 87,52 34,69
+scenery/car200 63,70 119,58
+scenery/car201 63,72 119,60
+scenery/car202 63,72 119,60
+scenery/car210 90,67 30,65
+scenery/car211 90,67 30,65
+scenery/car212 90,67 30,65
+scenery/car300 57,73 152,92
+scenery/car301 78,78 152,92 17,61
+scenery/car302 78,78 152,92 17,61
+scenery/car401 119,91 10,43
+scenery/car402 119,91 10,43
+scenery/car403 119,91 10,43
+scenery/moto1 79,53 15,38 37,46
+scenery/tardis 64,70

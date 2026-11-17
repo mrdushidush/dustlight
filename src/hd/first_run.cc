@@ -42,25 +42,66 @@ namespace {
 
 } // namespace
 
+std::vector<std::string> hdArtDirs(Config* config)
+{
+    char* value = nullptr;
+    std::string list;
+    if (configGetString(config, "hd", "hd_art_dir", &value) && value != nullptr && value[0] != '\0') {
+        list = value;
+    } else {
+        // P8.7 (the author, 2026-11-15: both art packs inside Et Tu): the Fallout 1
+        // art zip unpacks into hd-fo1\ next to Fallout 2's hd\; with its tier
+        // marker there, it comes first without anyone editing fallout2.cfg.
+        bool fo1 = false;
+        for (int tier = 2; tier <= 4 && !fo1; tier++) {
+            fo1 = fileExists("hd-fo1\\pack_" + std::to_string(tier) + "x.json");
+        }
+        list = fo1 ? "hd-fo1|hd" : "hd";
+    }
+    std::vector<std::string> dirs;
+    size_t start = 0;
+    while (start <= list.size()) {
+        size_t end = list.find('|', start);
+        if (end == std::string::npos) {
+            end = list.size();
+        }
+        std::string dir = list.substr(start, end - start);
+        while (!dir.empty() && (dir.back() == '\\' || dir.back() == '/' || dir.back() == ' ' || dir.back() == '\t')) {
+            dir.pop_back();
+        }
+        size_t first = dir.find_first_not_of(" \t");
+        if (first != std::string::npos) {
+            dirs.push_back(dir.substr(first));
+        }
+        start = end + 1;
+    }
+    if (dirs.empty()) {
+        dirs.push_back("hd");
+    }
+    return dirs;
+}
+
 int installedArtTiers(Config* config)
 {
-    char* dir = nullptr;
-    configGetString(config, "hd", "hd_art_dir", &dir, "hd");
-    std::string root = dir != nullptr && dir[0] != '\0' ? dir : "hd";
-    while (!root.empty() && (root.back() == '\\' || root.back() == '/')) {
-        root.pop_back();
-    }
-    int mask = 0;
-    for (int tier = 2; tier <= 4; tier++) {
-        char marker[64];
-        snprintf(marker, sizeof(marker), "\\pack_%dx.json", tier);
-        char bar[64];
-        snprintf(bar, sizeof(bar), "\\art\\intrface\\iface\\albedo_%dx.dds", tier);
-        if (fileExists(root + marker) || fileExists(root + bar)) {
-            mask |= 1 << tier;
+    int common = 0x1c; // tiers 2..4
+    int any = 0;
+    for (const std::string& root : hdArtDirs(config)) {
+        int mask = 0;
+        for (int tier = 2; tier <= 4; tier++) {
+            char marker[64];
+            snprintf(marker, sizeof(marker), "\\pack_%dx.json", tier);
+            char bar[64];
+            snprintf(bar, sizeof(bar), "\\art\\intrface\\iface\\albedo_%dx.dds", tier);
+            if (fileExists(root + marker) || fileExists(root + bar)) {
+                mask |= 1 << tier;
+            }
+        }
+        if (mask != 0) {
+            common &= mask;
+            any |= mask;
         }
     }
-    return mask;
+    return common != 0 && any != 0 ? common : any;
 }
 
 bool firstRunScreenSetup(Config* config)

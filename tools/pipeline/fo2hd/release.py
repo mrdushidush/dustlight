@@ -145,8 +145,8 @@ def game_hashes(game_dir: Path, report=print) -> set[bytes]:
     return hashes
 
 
-def tier_members(hdpack: Path, tier: int) -> tuple[list[Member], list[str]]:
-    """Every file one tier's art zip holds, and what is missing."""
+def tier_members(hdpack: Path, tier: int, prefix: str = "hd") -> tuple[list[Member], list[str]]:
+    """Every file one tier's art zip holds (under `prefix`, the art folder in the game folder), and what is missing."""
     members: list[Member] = []
     missing: list[str] = []
     for pack_json in sorted((hdpack / "art").rglob("pack.json")):
@@ -156,15 +156,15 @@ def tier_members(hdpack: Path, tier: int) -> tuple[list[Member], list[str]]:
         if tier not in meta.get("tiers", [tier]) or not dds.exists():
             missing.append(str(rel))
             continue
-        members.append(Member(f"hd/{rel.as_posix()}/pack.json", pack_json, pack_json.stat().st_size))
-        members.append(Member(f"hd/{rel.as_posix()}/{dds.name}", dds, dds.stat().st_size))
+        members.append(Member(f"{prefix}/{rel.as_posix()}/pack.json", pack_json, pack_json.stat().st_size))
+        members.append(Member(f"{prefix}/{rel.as_posix()}/{dds.name}", dds, dds.stat().st_size))
     fonts = hdpack / "fonts"
     if fonts.exists():
         index = fonts / "fonts.json"
         if index.exists():
-            members.append(Member("hd/fonts/fonts.json", index, index.stat().st_size))
+            members.append(Member(f"{prefix}/fonts/fonts.json", index, index.stat().st_size))
         for png in sorted(fonts.glob(f"*-{tier}x.png")):
-            members.append(Member(f"hd/fonts/{png.name}", png, png.stat().st_size))
+            members.append(Member(f"{prefix}/fonts/{png.name}", png, png.stat().st_size))
     return members, missing
 
 
@@ -300,15 +300,23 @@ def build(
     fields: dict[str, str] | None = None,
     page: Path | None = None,
     docs_only: bool = False,
+    art_prefix: str = "hd",
+    art_label: str = "art",
+    art_only: bool = False,
+    art_files: list[tuple[Path, str]] | None = None,
     report=print,
 ) -> dict:
+    """art_only (P8.7, Fallout 1 through Fallout Et Tu): only the art zips of a second art folder, which unpack into
+    `art_prefix` (hd-fo1) and are named <name>-<version>-<art_label>-<N>x.zip; no engine zip, no docs (the engine
+    zip of the same version carries them). art_files: (file, path under art_prefix) put in every tier's zip, e.g.
+    that folder's painted_shadows.json."""
     started = time.perf_counter()
     problems: list[str] = []
-    if not docs_only:
+    if not docs_only and not art_only:
         problems += check_imports(exe)
 
     report("release: collecting files")
-    tier_members_all = {tier: tier_members(hdpack, tier) for tier in tiers}
+    tier_members_all = {tier: tier_members(hdpack, tier, art_prefix) for tier in tiers}
     counts = pack_models(hdpack)
     report(f"  art by model: {counts}")
     if not docs_only:
@@ -345,8 +353,8 @@ def build(
                 raise SystemExit(f"release: {f}: placeholders left: {left}")
         report(f"release: docs only -> {out}: {written}")
         return {"name": name, "version": version, "files": [], "over_limit": [], "seconds": round(time.perf_counter() - started)}
-    engine = [Member(exe_name, exe, exe.stat().st_size), Member("ce.dat", ce_dat, ce_dat.stat().st_size)]
-    for src, arc in docs:
+    engine = [] if art_only else [Member(exe_name, exe, exe.stat().st_size), Member("ce.dat", ce_dat, ce_dat.stat().st_size)]
+    for src, arc in [] if art_only else docs:
         if src.suffix.lower() in (".md", ".txt"):
             data = filled(src)
             engine.append(Member(arc, None, len(data), data))
@@ -373,7 +381,10 @@ def build(
             "bytes": sum(m.size for m in members),
         }
         data = json.dumps(marker, indent=1).encode("utf-8")
-        members.insert(0, Member(f"hd/pack_{tier}x.json", None, len(data), data))
+        extra = [Member(f"{art_prefix}/{arc}", src, src.stat().st_size) for src, arc in art_files or []]
+        members[0:0] = [Member(f"{art_prefix}/pack_{tier}x.json", None, len(data), data)] + extra
+        for m in extra:
+            problems += check_leaks(m.arcname, m.source.read_bytes())
         tier_parts[tier] = split(members, max_part_bytes)
         report(f"  {tier}x: {len(members)} files, {marker['bytes'] / 1e9:.2f} GB raw -> {len(tier_parts[tier])} part(s)")
 
@@ -401,11 +412,12 @@ def build(
         return [(m.arcname, str(m.source) if m.source else None, m.data) for m in ms]
 
     base = f"{name}-{version}"
-    jobs.append((str(out / f"{base}-engine.zip"), entry(engine)))
+    if engine:
+        jobs.append((str(out / f"{base}-engine.zip"), entry(engine)))
     for tier, parts in tier_parts.items():
         for k, part in enumerate(parts, 1):
             suffix = f"-part{k}of{len(parts)}" if len(parts) > 1 else ""
-            jobs.append((str(out / f"{base}-art-{tier}x{suffix}.zip"), entry(part)))
+            jobs.append((str(out / f"{base}-{art_label}-{tier}x{suffix}.zip"), entry(part)))
     report(f"release: writing {len(jobs)} zips")
     results = []
     with ProcessPoolExecutor(max_workers=min(4, len(jobs))) as pool:
@@ -418,7 +430,7 @@ def build(
     # say so loudly; pass the real sizes with -Field size_Nx=... and build again.
     size_mismatch = []
     for tier in tiers:
-        real = sum(r["bytes"] for r in results if f"-art-{tier}x" in r["file"]) / 1e9
+        real = sum(r["bytes"] for r in results if f"-{art_label}-{tier}x" in r["file"]) / 1e9
         said = re.search(r"([0-9.]+) GB", values.get(f"size_{tier}x", ""))
         if said and abs(float(said.group(1)) - real) > max(0.1, 0.05 * real):
             size_mismatch.append(f"{tier}x: docs say {values[f'size_{tier}x']}, zips are {real:.2f} GB")
@@ -428,7 +440,8 @@ def build(
         (out / page.name).write_bytes(page_data)
     info = {
         "name": name, "version": version, "model": model, "tiers": tiers, "max_part_bytes": max_part_bytes,
-        "files": results, "over_limit": over, "size_mismatch": size_mismatch, "exe_imports": pe_imports(exe),
+        "files": results, "over_limit": over, "size_mismatch": size_mismatch, "exe_imports": [] if art_only else pe_imports(exe),
+        "art_prefix": art_prefix,
         "seconds": round(time.perf_counter() - started),
     }
     (out / "release.json").write_text(json.dumps(info, indent=1), encoding="utf-8", newline="\n")

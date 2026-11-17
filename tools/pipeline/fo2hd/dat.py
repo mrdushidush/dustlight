@@ -4,11 +4,13 @@
 stacks archives and loose folders in the same order as CE's gameDbInit, so the
 pipeline always sees the file the game sees:
 
-    master_patches > critter_patches > patchNNN.dat (highest N first)
-    > ce.dat > f2_res.dat > critter.dat > master.dat
+    master_patches > critter_patches > sfall mods (mods_order.txt, last line first)
+    > patchNNN.dat (highest N first) > ce.dat > f2_res.dat > critter.dat > master.dat
 
 Paths are case-insensitive with backslashes, as in the game ("art\\critters\\x.frm").
-sfall mods (mods_order.txt) are not stacked; vanilla installs have none.
+`master_dat`/`critter_dat` and the patch folders come from fallout2.cfg [system],
+relative to the game folder (Fallout Et Tu reads Fallout 2's `..\\master.dat`).
+CE doesn't load sfall.dat, and neither does this.
 """
 
 from __future__ import annotations
@@ -132,6 +134,30 @@ def _read_cfg_system(cfg: Path) -> dict[str, str]:
     return values
 
 
+def sfall_mods(game_dir: Path) -> list[Path]:
+    """The mods CE's sfallLoadMods (src/sfall_ext.cc) opens, in file order:
+    `mods\\mods_order.txt` lines, each a folder or archive under `mods`; a line
+    holding `;` or `#` anywhere is skipped, as are entries that don't exist.
+    Without the file, CE writes one from `mods\\*.dat` (files and folders,
+    sorted); this reads the folder the same way and writes nothing. CE opens
+    them in this order and each open goes on top, so later lines win."""
+    mods_dir = Path(game_dir) / "mods"
+    order = mods_dir / "mods_order.txt"
+    if order.exists():
+        names = []
+        for line in order.read_text(encoding="cp1252", errors="replace").splitlines():
+            if ";" in line or "#" in line:
+                continue
+            name = line.strip()
+            if name:
+                names.append(name)
+    elif mods_dir.is_dir():
+        names = sorted(p.name for p in mods_dir.iterdir() if p.suffix.lower() == ".dat")
+    else:
+        names = []
+    return [mods_dir / name for name in names if (mods_dir / name).exists()]
+
+
 class GameFiles:
     """The game's file system as CE assembles it from a game folder."""
 
@@ -148,6 +174,7 @@ class GameFiles:
             p = path(key, default)
             if p.is_dir() and p not in layers:
                 layers.append(p)
+        layers.extend(p for p in reversed(sfall_mods(self.game_dir)) if p not in layers)
         patches = []
         for index in range(1000):
             p = self.game_dir / f"patch{index:03d}.dat"
@@ -159,6 +186,7 @@ class GameFiles:
             if p.exists():
                 layers.append(p)
 
+        self.layer_paths = layers  # highest priority first
         self.layers = [open_archive(p) for p in layers]
 
     def find(self, path: str):

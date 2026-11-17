@@ -12,7 +12,10 @@ namespace fallout::hd {
 // HD art store (PLAN.md P4.3): the runtime packs written by `fo2hd pack`.
 //
 //   [hd] hd_art=1             draw HD art where a pack exists (default 1)
-//   [hd] hd_art_dir=<data_root>\hdpack   pack root (default "hd" in the game folder)
+//   [hd] hd_art_dir=<data_root>\hdpack   pack root (default "hd" in the game folder);
+//                             several folders separated by '|' are searched in
+//                             order, the first with a pack wins (P8.2: Fallout
+//                             Et Tu's "hd-fo1|hd"; first_run.h hdArtDirs)
 //   [hd] vram_budget_mb=1024  size of the HD page pool on the GPU (part of
 //                             the 8 GB VRAM budget, PLAN.md P4.5)
 //   [hd_debug] hd_force_original=1   every frame uses the original art (the
