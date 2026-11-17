@@ -33,6 +33,8 @@ OURS = ("src/hd/", "tools/", "docs/", "PLAN.md", "NOTICE.md", "README.md", "CMak
         "hd.local.ini.example", "src/object.cc", ".github/workflows/hd-ci.yml")
 # What may keep naming the old title: the decision record and the check against it.
 TITLE_STAYS = ("docs/decisions/0007-name-and-license.md", "tools/pipeline/fo2hd/release.py", "PLAN.md", "tools/scripts/public_export.py")
+# Keep the lowercase name: the scrub check's pattern for a local user folder looks for it.
+LOWER_NAME_STAYS = ("tools/scripts/scrub_check.py",)
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -47,7 +49,11 @@ def rewrite(path: str, text: str, keep_name: bool) -> str:
     text = text.replace("Modified by David (GitHub `mrdushidush`)", "Modified by `mrdushidush` (GitHub)")
     # The sentence-start form first. "David R. Tribble" wrote fpattern; he stays.
     text = re.sub(r"(^|[.!?:]\s+|\*\*)David(?! R\. Tribble)", lambda m: m.group(1) + "The author", text, flags=re.M)
-    return re.sub(r"\bDavid(?! R\. Tribble)", "the author", text)
+    text = re.sub(r"\bDavid(?! R\. Tribble)", "the author", text)
+    if path in LOWER_NAME_STAYS:
+        return text
+    # Lowercase, in code (the eye tools' "david" answer source, david_repeats, ...): "author", the same in every file.
+    return re.sub(r"(?<![A-Za-z])david(?![A-Za-z])", "author", text)
 
 
 def main() -> int:
@@ -118,9 +124,9 @@ def main() -> int:
           f"{git(out, 'rev-list', '--count', f'{UPSTREAM_BASE}..HEAD').strip()} commit(s) on upstream {UPSTREAM_BASE}")
     print("authors above upstream:", sorted(set(git(out, "log", "--format=%an <%ae>", f"{UPSTREAM_BASE}..HEAD").splitlines())))
     if not args.keep_name:
-        left = git(out, "grep", "-n", "-E", r"\bDavid\b", "--", *OURS) if subprocess.run(
-            ["git", "grep", "-q", "-E", r"\bDavid\b", "--", *OURS], cwd=out).returncode == 0 else ""
-        left = [l for l in left.splitlines() if "Tribble" not in l and "public_export.py" not in l]
+        left = git(out, "grep", "-n", "-i", "-E", r"david", "--", *OURS) if subprocess.run(
+            ["git", "grep", "-q", "-i", "-E", r"david", "--", *OURS], cwd=out).returncode == 0 else ""
+        left = [l for l in left.splitlines() if "Tribble" not in l and "public_export.py" not in l and not l.startswith(LOWER_NAME_STAYS)]
         print("first name left in our files:", left[:10] or "none")
     scrub = out / "tools" / "scripts" / "scrub_check.py"
     code = subprocess.run([sys.executable, "-I", str(scrub), "--history"], cwd=out).returncode

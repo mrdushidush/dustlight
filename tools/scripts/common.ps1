@@ -64,6 +64,14 @@ function Invoke-Native([scriptblock]$command) {
     & $command 2>&1 | ForEach-Object { "$_" }
 }
 
+# The PC counts as locked when the lock screen (LogonUI) runs in THIS session. Over Remote Desktop the PC's own
+# screen shows LogonUI in another session while the author works in his: not a lock (2026-11-16, a check started its
+# game on his remote screen). governor.py session_locked() is the same test.
+function Test-SessionLocked {
+    $mine = (Get-Process -Id $PID).SessionId
+    return [bool](Get-Process LogonUI -ErrorAction SilentlyContinue | Where-Object { $_.SessionId -eq $mine })
+}
+
 function Write-Step([string]$message) {
     Write-Host "==> $message" -ForegroundColor Cyan
 }

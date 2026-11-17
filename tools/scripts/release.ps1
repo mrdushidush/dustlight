@@ -95,6 +95,26 @@ if (-not $DocsOnly) {
         --game (Get-HdPaths)['working_copy'] --out $shadows } | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) { throw "painted_shadows.py failed ($LASTEXITCODE)" }
     $docs += "$shadows=hd/painted_shadows.json"
+
+    # HD packs of CE's own images (ce.dat, files\ce.dat\art) that no art release holds: built like the shipped
+    # interface art (fo2hd hdassets + pack, 4x-UltraSharpV2) into <release data root>\hdpack-ce and shipped with
+    # ce.dat in the engine zip, so every tier and both games get them (first: CE #792's greyed barter arrows,
+    # 2026-11-16). Every ce.dat image needs a pack in the art (-HdPack) or there, or a CE merge slipped one in.
+    $ceArt = Join-Path $data 'hdpack-ce'
+    $ceRoot = Join-Path $r 'files\ce.dat'
+    foreach ($img in Get-ChildItem (Join-Path $ceRoot 'art') -Recurse -File | Where-Object { $_.Extension -match '^\.(frm|png)$' }) {
+        $folder = $img.DirectoryName.Substring($ceRoot.Length + 1)
+        $packName = $(if ($img.Extension -ieq '.frm') { $img.BaseName } else { "$($img.BaseName)_$($img.Extension.TrimStart('.'))" }).ToLower()
+        $pack = Join-Path $folder $packName
+        if (-not (Test-Path (Join-Path $HdPack "$pack\pack.json")) -and -not (Test-Path (Join-Path $ceArt "$pack\pack.json"))) {
+            throw "CE's image $folder\$($img.Name) has no HD pack in $HdPack or $ceArt (build it into $ceArt)."
+        }
+    }
+    if (Test-Path $ceArt) {
+        foreach ($f in Get-ChildItem $ceArt -Recurse -File) {
+            $docs += "$($f.FullName)=hd/$($f.FullName.Substring($ceArt.Length + 1).Replace('\', '/'))"
+        }
+    }
 }
 foreach ($lic in Get-ChildItem (Join-Path $r 'third_party') -Recurse -Depth 1 -File | Where-Object { $_.Name -match '^LICENSE' }) {
     $docs += "$($lic.FullName)=hd/docs/licenses/$($lic.Directory.Name).txt"

@@ -1444,7 +1444,7 @@ void csOccluders(uint3 group : SV_GroupID, uint3 thread : SV_GroupThreadID)
     // barrels should look more 3D) gets a rounded body (sprite_shape.h) of
     // [hd_light] round_body strength and its own light category (round=).
     // Known by art name; cliffs, fences and buildings stay as they were.
-    // Default 0.5: The author's blind vote of 2026-11-10 (0.5 won 5 of 6 against
+    // Default 0.5, from the author's blind vote of 2026-11-10 (0.5 won 5 of 6 against
     // 0, 1 and 1.5; "the difference was very hard to tell").
     float roundBodyStrength()
     {

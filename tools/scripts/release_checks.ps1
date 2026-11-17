@@ -45,7 +45,7 @@ function Write-Log([string]$line) {
         try { Add-Content -LiteralPath $log -Value $text -Encoding utf8 -ErrorAction Stop; return } catch { Start-Sleep -Milliseconds 300 }
     }
 }
-function Test-Locked { return [bool](Get-Process LogonUI -ErrorAction SilentlyContinue) }
+function Test-Locked { return (Test-SessionLocked) }
 function Stop-TestGames {
     Get-CimInstance Win32_Process -Filter "Name='fallout2-ce.exe' OR Name='dustlight.exe'" | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($test, [StringComparison]::OrdinalIgnoreCase) } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }

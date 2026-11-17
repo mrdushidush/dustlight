@@ -2,6 +2,25 @@
 
 ## {version}
 
+A new engine only for Fallout 2: the 0.9.2-beta art packs stay as they are.
+
+- Fallout 1: the engine also plays Fallout 1 through the Fallout Et Tu mod, with its own
+  art pack (a separate download; see the README).
+- In combat, when a move can't reach the hex under the mouse (not enough AP, or someone
+  stands there), a marker shows where your character will stop and how many AP the walk
+  costs. `[qol] move_landing_marker=0` in `fallout2.cfg` turns it off.
+- In the barter screen the up and down arrows are greyed out when there is nothing more to
+  scroll, also in HD.
+- Fixes from Fallout 2 Community Edition, among them: used Geiger counters and Stealth Boys
+  can be sold again; items stack again after a long play session; Golgotha and the whale
+  encounter load properly from the world map; with perk carryover, a level that offers no
+  perk no longer blocks every later perk; your character no longer shows the wrong weapon
+  after loading a save; no black box on quick-load; the save/load screen and text and file
+  dialogs no longer run at a choppy 24 frames a second; and sfall fixes that mods such as
+  Fallout Et Tu rely on.
+
+## 0.9.3-beta
+
 A new engine only: the 0.9.2-beta art packs stay as they are.
 
 - The black shadows painted into the original art under buildings, scenery and cars are now

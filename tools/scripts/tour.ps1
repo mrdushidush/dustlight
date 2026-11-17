@@ -121,7 +121,7 @@ function Write-Log([string]$line) {
     [IO.File]::AppendAllText((Join-Path $runDir 'tour.crash.txt'), "$text (tour.log not writable)`r`n")
 }
 
-function Test-Locked { return $NotLocked -or [bool](Get-Process LogonUI -ErrorAction SilentlyContinue) }
+function Test-Locked { return $NotLocked -or (Test-SessionLocked) }
 
 # The art batch's mode file (tools/pipeline/fo2hd/governor.py): `pause` holds the batch.
 $batchModeFile = Join-Path $data 'batch_mode.txt'

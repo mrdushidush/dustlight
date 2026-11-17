@@ -21,6 +21,8 @@ sharper.
 - **Subtle effects:** a little film grain and vignette on the map (the interface is left
   alone).
 - **Toggle it all:** **Ctrl+F8** switches between HD and the original art, live.
+- **Fallout 1 too,** through the Fallout Et Tu mod, with its own art pack (see "Fallout 1"
+  below).
 
 ## What you need
 
@@ -61,6 +63,25 @@ Already use Fallout 2 CE? {name} is CE with the HD renderer added, so it replace
 `fallout2-ce.exe` in its role; your CE settings in `fallout2.cfg` are kept, except the
 screen settings on the first start.
 
+## Fallout 1 (through Fallout Et Tu)
+
+{name} also plays Fallout 1 through **Fallout Et Tu**, the mod that runs Fallout 1 inside the
+Fallout 2 engine. You need your own copies of **both** Fallout 1 and Fallout 2.
+
+1. Install Fallout Et Tu as its README says: unpack it into your Fallout 2 folder and let its
+   `UNDAT.EXE` take the art from your Fallout 1 `MASTER.DAT`. Et Tu's folder is then
+   `Fallout 2\Fallout1in2` (Epic: `fallout2\Fallout 2 English\Fallout1in2`).
+2. Extract `{name}-{version}-engine.zip` into that `Fallout1in2` folder and let it replace
+   `ce.dat` (it holds everything Et Tu's had, and a little more).
+3. Extract the Fallout 2 art pack for your screen into the same `Fallout1in2` folder (it goes
+   into `hd`), and the Fallout 1 art pack **of the same size** (`2x`, `3x` or `4x`) there too
+   (it goes into `hd-fo1`). Et Tu uses much of Fallout 2's art, so it needs both.
+4. Start **`{exe}`** from the `Fallout1in2` folder.
+
+{name} finds both art folders by itself: Fallout 1's art first, Fallout 2's for the rest.
+Everything else is as for Fallout 2: the keys, and the settings below, in
+`Fallout1in2\fallout2.cfg`.
+
 ## Settings
 
 Everything is in `fallout2.cfg` in the game folder.
@@ -89,6 +110,8 @@ everything else. The Restoration Project is supported this way.
 ## Uninstall
 
 Delete `{exe}` and the `hd` folder. Delete `ce.dat` too, unless you use Fallout 2 CE.
+For Fallout 1: delete `{exe}`, `hd` and `hd-fo1` in the `Fallout1in2` folder, and keep its
+`ce.dat`.
 
 ## Known limits
 

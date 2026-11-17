@@ -13,7 +13,11 @@
 - **Without the High Resolution Patch's files** (`f2_res.dat`) in your game folder, the
   interface bar is narrower, with black on both sides. The game itself runs the same.
 - **Art changed by mods** is shown in the original resolution.
-- **Total conversions** such as Fallout: Sonora, Et Tu and Fallout of Nevada haven't been
-  tested with Dustlight yet; the Restoration Project has.
+- **Total conversions** such as Fallout: Sonora and Fallout of Nevada haven't been tested
+  with Dustlight yet; the Restoration Project and Fallout Et Tu have.
+- **Fallout 1 (through Et Tu)** was tested with the Epic Games version of Fallout 1 in
+  English. Et Tu's fix that keeps a lit flare in your hand always giving light doesn't work:
+  it needs an sfall feature that Fallout 2 CE doesn't have yet (the same happens with CE's
+  own exe).
 - **Movies** play as in the original.
 - **Windows may warn** that the exe is from an unknown publisher (it isn't signed).

@@ -3,7 +3,7 @@
 The batch runs on the PC he uses every day, so it adapts to what the PC is
 doing. Modes:
 
-  full    the PC is locked (LogonUI.exe runs: he is away) -> as fast as it goes,
+  full    the PC is locked (LogonUI.exe runs in our session: he is away) -> as fast as it goes,
           even if the game runs: then it is a scripted test run (tests open
           the game only while the PC is locked), not the author playing
   shared  he is at the PC -> after each unit of GPU work, sleep so the batch
@@ -60,24 +60,43 @@ class _ProcessEntry(ctypes.Structure):
     ]
 
 
-def process_names() -> set[str]:
-    """Lower-case exe names of all running processes (Toolhelp snapshot)."""
+def _processes() -> list[tuple[str, int]]:
+    """(lower-case exe name, pid) of all running processes (Toolhelp snapshot)."""
     k32 = ctypes.windll.kernel32
     k32.CreateToolhelp32Snapshot.restype = wt.HANDLE
     snap = k32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
     if snap in (None, wt.HANDLE(-1).value):
-        return set()
-    names = set()
+        return []
+    found = []
     entry = _ProcessEntry()
     entry.dwSize = ctypes.sizeof(_ProcessEntry)
     try:
         ok = k32.Process32FirstW(wt.HANDLE(snap), ctypes.byref(entry))
         while ok:
-            names.add(entry.szExeFile.lower())
+            found.append((entry.szExeFile.lower(), entry.th32ProcessID))
             ok = k32.Process32NextW(wt.HANDLE(snap), ctypes.byref(entry))
     finally:
         k32.CloseHandle(wt.HANDLE(snap))
-    return names
+    return found
+
+
+def _session_id(pid: int) -> int:
+    sid = wt.DWORD(0xFFFFFFFF)
+    ctypes.windll.kernel32.ProcessIdToSessionId(wt.DWORD(pid), ctypes.byref(sid))
+    return sid.value
+
+
+def process_names() -> set[str]:
+    """Lower-case exe names of all running processes."""
+    return {name for name, _ in _processes()}
+
+
+def session_locked(processes: list[tuple[str, int]] | None = None) -> bool:
+    """The PC counts as locked when the lock screen (LogonUI) runs in OUR session. Over Remote Desktop the PC's own
+    screen shows LogonUI in another session while the author works in his (2026-11-16: a check started its game on his
+    remote screen), so LogonUI anywhere is not enough."""
+    mine = _session_id(ctypes.windll.kernel32.GetCurrentProcessId())
+    return any(name == LOCK_PROCESS and _session_id(pid) == mine for name, pid in (processes or _processes()))
 
 
 def lower_priority(priority_class: int = BELOW_NORMAL_PRIORITY_CLASS) -> None:
@@ -140,8 +159,9 @@ class Governor:
             elif override in ("full", "shared"):
                 mode = override
             else:
-                names = process_names()
-                if LOCK_PROCESS in names:
+                processes = _processes()
+                names = {name for name, _ in processes}
+                if session_locked(processes):
                     mode = "full"
                 elif names & GAME_PROCESSES or self.locked_only:
                     mode = "paused"

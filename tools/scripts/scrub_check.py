@@ -23,7 +23,7 @@ UPSTREAM_BASE = "ebb9c716"  # fallout2-ce/fallout2-ce at the fork (PLAN.md)
 GAME_TYPES = re.compile(r"\.(frm|fr[0-5]|pal|msg|dat|acm|map|pro|int|lst|mve|lip|gam|sav|aaf|fon|rix)$", re.I)
 UPSTREAM_DATA = ("files/", "sfall_testing/", "os/")
 TEXT_PATTERNS = {
-    "local path": re.compile(r"[A-Za-z]:\\\\?(Games|fo2hd-data|fo2hd-release|Users\\\\?david)\b", re.I),
+    "local path": re.compile(r"[A-Za-z]:\\\\?(Games|fo2hd-data|fo2hd-release|fo2hd-fo1|Users\\\\?david)\b", re.I),
     "mail address": re.compile(r"[\w.+-]+@(gmail|outlook|hotmail|yahoo|proton)\.\w+", re.I),
     "credential": re.compile(r"(sk-[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|xox[baprs]-[A-Za-z0-9-]{10,})"),
 }

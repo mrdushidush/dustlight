@@ -36,7 +36,7 @@ $parts = @()
 foreach ($s in (Get-Content -Raw $scenesFile | ConvertFrom-Json)) {
     $name = $s.name
     if ($names.Count -gt 0 -and $names -notcontains $name) { continue }
-    while (-not (Get-Process LogonUI -ErrorAction SilentlyContinue)) { Start-Sleep -Seconds 10 }
+    while (-not (Test-SessionLocked)) { Start-Sleep -Seconds 10 }
     # [hd] enabled=1: a clean install doesn't take the developer hotkeys, and Ctrl+F4 starts a sequence.
     & (Join-Path $PSScriptRoot 'phase6_capture.ps1') -Scene $name -States 'hd' -Seq -SeqCount $frames -SeqStep 2 -SeqRect "$($s.x),31,1920,1080" `
         -ScenesFile $scenesFile -ArtDir $installedArt -Extra @('"[hd]enabled=1"', '"[hd_debug]capture_no_cursor=1"')

@@ -41,7 +41,7 @@ function Write-Log([string]$line) {
         try { Add-Content -LiteralPath $log -Value $text -Encoding utf8 -ErrorAction Stop; return } catch { Start-Sleep -Milliseconds 300 }
     }
 }
-function Test-Locked { return [bool](Get-Process LogonUI -ErrorAction SilentlyContinue) }
+function Test-Locked { return (Test-SessionLocked) }
 
 if ($Stop) {
     if (Test-Path $pidFile) {
