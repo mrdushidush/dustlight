@@ -70,7 +70,6 @@ typedef enum ExplosionMetarule {
 static constexpr int kVersionMajor = 4;
 static constexpr int kVersionMinor = 3;
 static constexpr int kVersionPatch = 4;
-static constexpr int kSfallPathBufferSize = 3200; // matches rotation path size in animation.cc
 
 static void op_art_exists(Program* program)
 {
@@ -1740,6 +1739,30 @@ static void op_resize_array(Program* program)
     ResizeArray(arrayId, newLen);
 }
 
+// get_npc_level
+static void op_get_npc_level(Program* program)
+{
+    ProgramValue value = programStackPopValue(program);
+    int level = -1;
+    if (value.isString()) {
+        level = partyMemberGetNpcLevel(kPartyMemberLookupByName, programGetString(program, value.opcode, value.integerValue));
+    } else if (value.isInt()) {
+        level = partyMemberGetNpcLevel(value.integerValue);
+    }
+    programStackPushInteger(program, level);
+}
+
+// inc_npc_level
+static void op_inc_npc_level(Program* program)
+{
+    ProgramValue value = programStackPopValue(program);
+    if (value.isString()) {
+        partyMemberIncNpcLevel(kPartyMemberLookupByName, programGetString(program, value.opcode, value.integerValue));
+    } else if (value.isInt()) {
+        partyMemberIncNpcLevel(value.integerValue);
+    }
+}
+
 // party_member_list
 static void op_party_member_list(Program* program)
 {
@@ -1919,10 +1942,7 @@ static void op_make_path(Program* program)
     // sfall only requires an empty destination tile when the source object is a critter.
     int requireEmptyDest = ProtoId(object).objectType() == OBJ_TYPE_CRITTER;
 
-    // XXX: pathfinderFindPath does not accept a destination buffer length. Use the
-    // same capacity as the engine's AnimationSad::rotations storage so this
-    // wrapper is not the limiting factor.  Sfall uses 800 here
-    unsigned char rotations[kSfallPathBufferSize];
+    unsigned char rotations[kPathfinderMaxPathLength];
     int pathLength = pathfinderFindPath(object, object->tile, dest, rotations, requireEmptyDest, get_blocking_func(type));
     ResizeArray(arrayId, pathLength);
     for (int index = 0; index < pathLength; index++) {
@@ -2526,7 +2546,9 @@ void sfallOpcodesInit()
     // 0x81a4 - void set_eax_environment(int environment)
 
     // 0x81a5 - void inc_npc_level(int pid/string name)
+    interpreterRegisterOpcode(0x81A5, op_inc_npc_level);
     // 0x8241 - int  get_npc_level(int pid/string name)
+    interpreterRegisterOpcode(0x8241, op_get_npc_level);
 
     // 0x81a6 - int get_viewport_x()
     // 0x81a7 - int get_viewport_y()

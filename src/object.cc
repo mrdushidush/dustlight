@@ -938,7 +938,10 @@ void _obj_render_post_roof(Rect* rect, MapElevation elevation)
         objectDrawOutline(object, &updatedRect);
     }
 
+    // The landing marker's AP label is text too: recorded in the Text pass (see the label function).
     hd::recordPass(hd::DrawPass::Text);
+    gameMouseRenderLandingMarkerLabel(gObjectsWindowBuffer, gObjectsWindowPitch, &updatedRect);
+
     textObjectsRenderInRect(&updatedRect);
 
     hd::recordPass(hd::DrawPass::Overlay);
@@ -2051,6 +2054,14 @@ int _obj_toggle_flat(Object* object, Rect* rect)
 // 0x48B0FC obj_erase_object
 int objectDestroy(Object* object, Rect* rect)
 {
+    if (rect != nullptr) {
+        // Detached objects have no world bounds to return. Give callers a
+        // harmless one-pixel refresh instead of leaving the bounds unwritten.
+        // TODO: Report whether bounds were produced so callers can skip the
+        // refresh entirely for detached objects and failed destruction.
+        *rect = { 0, 0, 0, 0 };
+    }
+
     if (object == nullptr) {
         return -1;
     }
@@ -2472,7 +2483,8 @@ bool _obj_occupied(int tile, MapElevation elevation)
     while (objectListNode != nullptr) {
         if (objectListNode->obj->elevation == elevation
             && objectListNode->obj != gGameMouseBouncingCursor
-            && objectListNode->obj != gGameMouseHexCursor) {
+            && objectListNode->obj != gGameMouseHexCursor
+            && objectListNode->obj != gGameMouseLandingMarker) {
             return true;
         }
         objectListNode = objectListNode->next;
