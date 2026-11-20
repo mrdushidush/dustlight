@@ -75,7 +75,8 @@ Fallout 2 engine. You need your own copies of **both** Fallout 1 and Fallout 2.
    `ce.dat` (it holds everything Et Tu's had, and a little more).
 3. Extract the Fallout 2 art pack for your screen into the same `Fallout1in2` folder (it goes
    into `hd`), and the Fallout 1 art pack **of the same size** (`2x`, `3x` or `4x`) there too
-   (it goes into `hd-fo1`). Et Tu uses much of Fallout 2's art, so it needs both.
+   (it goes into `hd-fo1`). Et Tu uses much of Fallout 2's art, so it needs both. The Fallout 1
+   art packs are on their own Nexus Mods page: https://www.nexusmods.com/fallout/mods/38
 4. Start **`{exe}`** from the `Fallout1in2` folder.
 
 {name} finds both art folders by itself: Fallout 1's art first, Fallout 2's for the rest.

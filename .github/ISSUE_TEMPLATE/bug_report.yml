@@ -5,8 +5,18 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting! Please report Dustlight problems here, not to Fallout 2 CE.
+        Thanks for reporting! Please report Dustlight problems here, not to Fallout 2 CE or the Fallout Et Tu team.
         Dustlight has only been tested on one PC so far, so your graphics card and screen help a lot.
+
+  - type: dropdown
+    id: game
+    attributes:
+      label: Which game?
+      options:
+        - Fallout 2
+        - Fallout 1 (through Fallout Et Tu)
+    validations:
+      required: true
 
   - type: textarea
     id: what
@@ -41,7 +51,7 @@ body:
     id: log
     attributes:
       label: debug.log
-      description: The game writes `debug.log` in its folder, next to dustlight.exe, fresh at each start. Drag it here right after the problem, before starting the game again.
+      description: The game writes `debug.log` in its folder, next to dustlight.exe (for Fallout 1, the `Fallout1in2` folder), fresh at each start. Drag it here right after the problem, before starting the game again.
     validations:
       required: false
 
@@ -57,8 +67,8 @@ body:
     id: version
     attributes:
       label: Dustlight version
-      description: From the zip's name, for example 0.9.0-beta.
-      placeholder: 0.9.0-beta
+      description: From the engine zip's name, for example 0.9.4-beta.
+      placeholder: 0.9.4-beta
     validations:
       required: true
 
@@ -66,6 +76,7 @@ body:
     id: pack
     attributes:
       label: Art pack
+      description: For Fallout 1, the size of both packs (Fallout 2's and Fallout 1's).
       options:
         - 2x
         - 3x
@@ -93,7 +104,7 @@ body:
   - type: dropdown
     id: store
     attributes:
-      label: Your copy of Fallout 2
+      label: Where your copy of the game is from (for Fallout 1, Fallout 1's)
       options:
         - Epic
         - GOG
@@ -114,7 +125,7 @@ body:
     id: mods
     attributes:
       label: Other mods
-      description: For example the Restoration Project, the High Resolution Patch, sfall, Sonora. Write "none" if none.
+      description: For example the Restoration Project, the High Resolution Patch, sfall, Sonora. For Fallout 1, Et Tu's version and any of its optional mods you turned on. Write "none" if none.
       placeholder: none
     validations:
       required: true

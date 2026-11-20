@@ -1,20 +1,31 @@
 # Dustlight
 
-**Dustlight is a free mod for Fallout 2: the original game with HD art and new lighting.**
+**Dustlight is a free mod for Fallout 2, and for Fallout 1 through Fallout Et Tu: the
+original games with HD art and new lighting.**
 It is a **modified version** of Fallout 2 Community Edition (see [NOTICE.md](NOTICE.md)) and
 runs on Windows with Direct3D 11. This repository holds no game data and no HD art; to play,
-you need your own copy of Fallout 2.
+you need your own copy of Fallout 2 (and of Fallout 1 too, for Fallout 1).
 
-![New Reno at night: the original on the left, Dustlight on the right](docs/media/compare-newreno-night.jpg)
+![New Reno at night in Fallout 2: the original on the left, Dustlight on the right](docs/media/compare-newreno-night.jpg)
 
-- **Download:** the [engine](https://github.com/mrdushidush/dustlight/releases) from this repository's releases (the newest at the top), and one art pack from [Nexus Mods](https://www.nexusmods.com/fallout2/mods/193).
-- **Install and settings:** in the README inside the download; its template, with the
-  blanks filled at release time, is [docs/player/README.md](docs/player/README.md)
+![Junktown's gate at night in Fallout 1: the original on the left, Dustlight on the right](docs/media/compare-fo1-junktown-night.jpg)
+
+- **Download for Fallout 2:** the [engine](https://github.com/mrdushidush/dustlight/releases) from this
+  repository's releases (the newest at the top), and one art pack from
+  [Nexus Mods' Fallout 2 page](https://www.nexusmods.com/fallout2/mods/193).
+- **Download for Fallout 1:** first [Fallout Et Tu](https://github.com/rotators/Fo1in2/releases), the
+  Rotators team's mod that brings Fallout 1 into the Fallout 2 engine. Then the same engine
+  (0.9.4 or newer), a Fallout 2 art pack, and the Fallout 1 art pack of the same size from
+  [Nexus Mods' Fallout 1 page](https://www.nexusmods.com/fallout/mods/38). Everything goes into
+  Et Tu's `Fallout1in2` folder. Rules, story and saves are Et Tu's.
+- **Install and settings:** in the README inside the download (Fallout 1 has its own
+  section); its template, with the blanks filled at release time, is
+  [docs/player/README.md](docs/player/README.md)
 - **Bugs:** please [report them here](https://github.com/mrdushidush/dustlight/issues/new?template=bug_report.yml),
-  not to Fallout 2 CE.
-- **Tested with:** Fallout 2 and the Restoration Project. Total conversions such as Fallout:
-  Sonora and Et Tu haven't been tested with Dustlight yet; the support list in CE's README
-  below is about CE.
+  not to Fallout 2 CE or the Et Tu team.
+- **Tested with:** Fallout 2, the Restoration Project, and Fallout 1 through Fallout Et Tu
+  2.0.3911 (the Epic versions in English, on one PC so far). Fallout: Sonora hasn't been
+  tested with Dustlight yet; the support list in CE's README below is about CE.
 - **What's new here:** `src/hd/` (the renderer, HD art store, lighting and HD interface),
   `tools/pipeline/` (the Python pipeline that makes the art), `docs/decisions/` (why it's
   built this way). Changes to CE's own files are kept to thin hooks.
@@ -22,8 +33,8 @@ you need your own copy of Fallout 2.
   `cmake --build out/build/windows-x64 --config RelWithDebInfo`.
 - **License:** the Sustainable Use License v1.0, as for CE ([LICENSE.md](LICENSE.md)): free and
   non-commercial.
-- **AI:** characters and creatures use no AI: they are the original pixels, enlarged with
-  Scale2x. The world, items, talking heads, interface and fonts are upscaled by an AI model,
+- **AI**, the same in both games: characters and creatures use no AI: they are the original
+  pixels, enlarged with Scale2x. The world, items, talking heads, interface and fonts are upscaled by an AI model,
   [4x-UltraSharpV2](https://github.com/Kim2091/Kim2091-Models) by Kim2091, used with
   [Kim2091's permission](https://github.com/Kim2091/Kim2091-Models/issues/6)
   ([support Kim2091's work](https://ko-fi.com/J3J3BCC3L)), and the world is mixed back with the
